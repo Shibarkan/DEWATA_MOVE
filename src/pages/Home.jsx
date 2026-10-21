@@ -1,12 +1,5 @@
 
-import {
-  ArrowRight,
-  ArrowDown,
-  Activity,
-  MapPinned,
-  TrainFront,
-  SlidersHorizontal,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import Reveal from "../components/ui/Reveal";
 import SimulationPreview from "../components/home/SimulationPreview";
@@ -18,134 +11,311 @@ import {
   privateVehicleShareReference,
 } from "../data/mobility";
 
-const challenges = [
+// DATA PENELITIAN
+const statistics = [
   {
-    icon: Activity,
-    title: "High Private Vehicle Dependence",
-    text: "Dominasi kendaraan pribadi menjadi tantangan dalam transisi menuju mobilitas berkelanjutan.",
+    value: "13",
+    label: "Zona analisis",
+    detail: "Wilayah studi dalam MAT 2026",
   },
   {
-    icon: TrainFront,
-    title: "Public Transport Integration",
-    text: "Integrasi layanan TMD, feeder, halte, jadwal, dan akses perjalanan perlu dievaluasi.",
+    value: formatNumber(matTotal),
+    label: "Total MAT 2026",
+    detail: "Satuan smp/jam",
   },
   {
-    icon: MapPinned,
-    title: "Spatial Demand Concentration",
-    text: "Distribusi asal dan tujuan perjalanan menunjukkan kebutuhan penanganan antarzona.",
+    value: `${privateVehicleShareReference}%`,
+    label: "Kendaraan pribadi",
+    detail: "Referensi mode share Bali 2024",
+  },
+];
+
+const researchFocus = [
+  {
+    number: "01",
+    title: "Pola pergerakan",
+    description:
+      "Mengidentifikasi bangkitan, tarikan, dan distribusi perjalanan antarzona berdasarkan Matriks Asal Tujuan.",
+  },
+  {
+    number: "02",
+    title: "Strategi TDM",
+    description:
+      "Mengkaji pengelolaan permintaan perjalanan, integrasi angkutan umum, dan pengendalian penggunaan kendaraan pribadi.",
+  },
+  {
+    number: "03",
+    title: "Evaluasi skenario",
+    description:
+      "Menyiapkan perbandingan kinerja jaringan antara kondisi Business as Usual dan penerapan kebijakan TDM pada 2041.",
   },
 ];
 
 export default function Home({ onNavigate }) {
   return (
-    <div className="overflow-hidden bg-white">
+    <div className="overflow-hidden bg-white text-slate-900">
 
-      {/* HERO */}
-      <section className="relative isolate px-5 pb-20 pt-20 text-center sm:pb-24 sm:pt-28 lg:pt-32">
-        <div className="hero-orb pointer-events-none absolute -left-32 top-0 -z-10 h-80 w-80 rounded-full bg-red-100/60 blur-[100px]" />
+      {/* ==================================
+          HERO
+      ================================== */}
 
-        <div className="hero-orb hero-orb-delay pointer-events-none absolute -right-32 top-32 -z-10 h-96 w-96 rounded-full bg-orange-100/50 blur-[110px]" />
+      <section className="border-b border-slate-100">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.2fr_0.8fr] lg:gap-20 lg:pb-28 lg:pt-28">
 
-        <div className="mx-auto max-w-5xl">
-          <div className="hero-enter mb-7 inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] text-[#B91C1C]">
-            <Activity size={14} />
-            Urban Mobility Simulation Laboratory
+          {/* LEFT CONTENT */}
+          <div>
+            <div className="hero-enter mb-7 flex items-center gap-3">
+              <span className="h-[2px] w-8 bg-[#B91C1C]" />
+
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
+                Studi Transportasi Kota Denpasar
+              </p>
+            </div>
+
+            <h1 className="hero-enter hero-delay-1 max-w-3xl text-[42px] font-bold leading-[1.12] tracking-[-0.045em] text-[#17202D] sm:text-6xl lg:text-[70px]">
+              Memahami
+              <br />
+              pergerakan kota.
+              <br />
+              <span className="text-[#B91C1C]">
+                Merancang 2041.
+              </span>
+            </h1>
+
+            <p className="hero-enter hero-delay-2 mt-8 max-w-xl text-[15px] leading-8 text-slate-600 sm:text-base">
+              Denpasar 2041 merupakan platform kajian
+              transportasi yang menghubungkan analisis
+              permintaan perjalanan, pemodelan jaringan,
+              dan strategi Transport Demand Management
+              untuk mendukung perencanaan mobilitas
+              perkotaan.
+            </p>
+
+            <div className="hero-enter hero-delay-3 mt-9 flex flex-wrap items-center gap-4">
+              <button
+                onClick={() => onNavigate("problems")}
+                className="group inline-flex items-center gap-3 rounded-full bg-[#B91C1C] px-7 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#991B1B] hover:shadow-lg"
+              >
+                Lihat Strategi TDM
+
+                <ArrowUpRight
+                  size={17}
+                  className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                />
+              </button>
+
+              <button
+                onClick={() => onNavigate("data")}
+                className="group inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:text-[#B91C1C]"
+              >
+                Jelajahi Data
+
+                <ArrowRight
+                  size={16}
+                  className="transition-transform group-hover:translate-x-1"
+                />
+              </button>
+            </div>
           </div>
 
-          <h1 className="hero-enter hero-delay-1 mx-auto max-w-4xl text-4xl font-black leading-[1.12] tracking-[-0.045em] text-[#17202D] sm:text-6xl lg:text-[76px]">
-            A Smarter Future
-            <br />
-            for{" "}
-            <span className="text-[#B91C1C]">
-              Denpasar Mobility.
-            </span>
-          </h1>
+          {/* RIGHT — STUDY SUMMARY */}
+          <div className="hero-enter hero-delay-3">
+            <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-[#FAFAFA]">
 
-          <p className="hero-enter hero-delay-2 mx-auto mt-7 max-w-2xl text-sm leading-8 text-slate-500 sm:text-base lg:text-lg">
-            Membangun sistem transportasi perkotaan yang lebih
-            efisien, terintegrasi, dan berkelanjutan melalui
-            pemodelan matematis serta strategi
-            Transport Demand Management menuju 2041.
-          </p>
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 sm:px-8">
+                <p className="text-sm font-semibold text-slate-900">
+                  Ringkasan studi
+                </p>
 
-          <div className="hero-enter hero-delay-3 mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <button
-              onClick={() => onNavigate("before")}
-              className="group inline-flex items-center justify-center gap-3 rounded-full bg-[#B91C1C] px-7 py-4 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(185,28,28,0.2)] transition-all duration-300 hover:-translate-y-1 hover:bg-red-800"
-            >
-              Explore Modeling
-              <ArrowRight
-                size={18}
-                className="transition-transform group-hover:translate-x-1"
-              />
-            </button>
+                <span className="text-xs text-slate-400">
+                  2026—2041
+                </span>
+              </div>
 
-            <button
-              onClick={() => onNavigate("problems")}
-              className="rounded-full border border-slate-200 px-7 py-4 text-sm font-semibold text-slate-700 transition-all duration-300 hover:-translate-y-1 hover:bg-slate-50"
-            >
-              Explore TDM Solutions
-            </button>
+              <div className="divide-y divide-slate-200 px-6 sm:px-8">
+                {statistics.map((item) => (
+                  <div
+                    key={item.label}
+                    className="py-6"
+                  >
+                    <p className="text-[29px] font-bold tracking-tight text-[#B91C1C] sm:text-4xl">
+                      {item.value}
+                    </p>
+
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {item.label}
+                    </p>
+
+                    <p className="mt-1 text-xs leading-6 text-slate-500">
+                      {item.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-5 sm:px-8">
+                <p className="text-xs leading-6 text-slate-500">
+                  Analisis menggunakan data studi kasus
+                  dan asumsi pemodelan yang dinyatakan
+                  secara terpisah.
+                </p>
+              </div>
+            </div>
           </div>
-
-          <a
-            href="#overview"
-            className="hero-enter hero-delay-4 mt-16 inline-flex flex-col items-center gap-2 text-xs font-medium text-slate-400"
-          >
-            Scroll to Explore
-            <ArrowDown size={19} className="scroll-arrow" />
-          </a>
         </div>
       </section>
 
-      {/* DATA OVERVIEW */}
-      <section
-        id="overview"
-        className="scroll-mt-28 px-5 pb-24 sm:px-8"
-      >
-        <div className="mx-auto max-w-7xl">
+      {/* ==================================
+          INTRODUCTION
+      ================================== */}
+
+      <section className="px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+
           <Reveal>
-            <div className="mb-10 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
-                Understanding the Challenge
+            <div>
+              <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
+                Latar Belakang
               </p>
 
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                Mobility by the Numbers.
+              <h2 className="max-w-md text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl">
+                Persoalan transportasi tidak cukup
+                diselesaikan dengan menambah jalan.
               </h2>
             </div>
           </Reveal>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              {
-                value: `${privateVehicleShareReference}%`,
-                label: "Private Vehicle Mode Share",
-                note: "Referensi Bali 2024 — mobil + motor",
-              },
-              {
-                value: formatNumber(matTotal),
-                label: "Total OD Matrix",
-                note: "MAT 2026 • smp/jam",
-              },
-              {
-                value: `Z${largestOD.origin} → Z${largestOD.destination}`,
-                label: "Highest OD Pair",
-                note: `${formatNumber(largestOD.volume)} smp/jam`,
-              },
-            ].map((item, i) => (
-              <Reveal key={item.label} delay={i * 100}>
-                <div className="feature-card h-full rounded-3xl border border-slate-200 bg-white p-7 sm:p-8">
-                  <p className="text-3xl font-black tracking-tight text-[#B91C1C] sm:text-4xl">
-                    {item.value}
+          <Reveal delay={100}>
+            <div className="space-y-5 text-[15px] leading-8 text-slate-600">
+              <p>
+                Referensi mode share Bali tahun 2024
+                menunjukkan dominasi sepeda motor dan
+                mobil pribadi sebesar{" "}
+                <strong className="font-semibold text-slate-900">
+                  {privateVehicleShareReference}%.
+                </strong>{" "}
+                Kondisi ini menjadi salah satu dasar
+                penting untuk mengkaji alternatif
+                mobilitas yang lebih efisien.
+              </p>
+
+              <p>
+                Berdasarkan MAT 2026, pasangan perjalanan
+                terbesar terdapat pada zona{" "}
+                <strong className="font-semibold text-slate-900">
+                  Z{largestOD.origin} menuju
+                  Z{largestOD.destination}
+                </strong>{" "}
+                dengan nilai{" "}
+                <strong className="font-semibold text-slate-900">
+                  {formatNumber(largestOD.volume)} smp/jam.
+                </strong>{" "}
+                Distribusi tersebut menjadi masukan
+                untuk analisis pola perjalanan dan
+                pembebanan jaringan.
+              </p>
+
+              <p>
+                Penelitian ini mengkaji bagaimana
+                kombinasi pengelolaan permintaan
+                perjalanan, peningkatan pelayanan
+                angkutan umum, dan pengaturan jaringan
+                dapat dievaluasi melalui skenario
+                transportasi menuju 2041.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ==================================
+          NETWORK PREVIEW
+      ================================== */}
+
+      <section className="bg-[#F8F9FA] px-4 py-20 sm:px-6 sm:py-28">
+        <div className="mx-auto max-w-7xl">
+
+          <Reveal>
+            <div className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <div className="max-w-2xl">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
+                  Visualisasi Jaringan
+                </p>
+
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                  Melihat pergerakan secara spasial.
+                </h2>
+
+                <p className="mt-4 text-sm leading-7 text-slate-600">
+                  Gambaran awal lingkungan visualisasi
+                  yang akan digunakan untuk menampilkan
+                  jaringan jalan dan hasil pembebanan
+                  lalu lintas.
+                </p>
+              </div>
+
+              <button
+                onClick={() => onNavigate("before")}
+                className="group inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#B91C1C]"
+              >
+                Lihat Kerangka Model
+                <ArrowUpRight
+                  size={17}
+                  className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                />
+              </button>
+            </div>
+          </Reveal>
+
+          <Reveal delay={100}>
+            <SimulationPreview />
+          </Reveal>
+
+          <p className="mt-5 text-xs leading-6 text-slate-500">
+            Visualisasi di atas menggunakan jaringan
+            demonstrasi dan belum merepresentasikan
+            hasil simulasi geografis Denpasar.
+          </p>
+        </div>
+      </section>
+
+      {/* ==================================
+          RESEARCH FOCUS
+      ================================== */}
+
+      <section className="px-5 py-20 sm:px-8 sm:py-28">
+        <div className="mx-auto max-w-7xl">
+
+          <Reveal>
+            <div className="mb-12 max-w-2xl">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
+                Ruang Lingkup Penelitian
+              </p>
+
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                Tiga bagian utama dalam kajian.
+              </h2>
+            </div>
+          </Reveal>
+
+          <div className="grid gap-0 border-t border-slate-200 md:grid-cols-3">
+            {researchFocus.map((item, index) => (
+              <Reveal
+                key={item.number}
+                delay={index * 100}
+              >
+                <div className="h-full border-b border-slate-200 py-8 md:border-r md:px-7 md:py-9 md:first:pl-0 md:last:border-r-0">
+
+                  <p className="mb-8 text-sm font-bold text-[#B91C1C]">
+                    {item.number}
                   </p>
 
-                  <h3 className="mt-4 font-bold text-slate-900">
-                    {item.label}
+                  <h3 className="mb-4 text-xl font-semibold text-slate-900">
+                    {item.title}
                   </h3>
 
-                  <p className="mt-2 text-xs leading-6 text-slate-500">
-                    {item.note}
+                  <p className="text-sm leading-7 text-slate-600">
+                    {item.description}
                   </p>
                 </div>
               </Reveal>
@@ -154,87 +324,110 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* VISUAL SHOWCASE */}
-      <section className="px-4 pb-24 sm:px-6 lg:pb-32">
-        <Reveal>
-          <div className="mb-10 text-center">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
-              Interactive Network
-            </p>
+      {/* ==================================
+          MODELING OVERVIEW
+      ================================== */}
 
-            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              Visualize Urban Mobility.
-            </h2>
-
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-slate-500">
-              Eksplorasi ilustrasi jaringan transportasi
-              sebagai gambaran awal lingkungan simulasi.
-            </p>
-          </div>
-        </Reveal>
-
-        <Reveal delay={100}>
-          <SimulationPreview />
-        </Reveal>
-      </section>
-
-      {/* CHALLENGES */}
-      <section className="border-y border-slate-100 bg-[#FAFAFA] px-5 py-24 sm:px-8">
+      <section className="border-t border-slate-200 bg-white px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">
+
           <Reveal>
-            <div className="mb-12 max-w-3xl">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
-                Problem Identification
+            <div className="mb-10 max-w-3xl">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
+                Pemodelan Transportasi
               </p>
 
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-                Why Denpasar
-                <br />
-                Needs a New Approach.
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                Dua skenario untuk tahun 2041.
               </h2>
 
-              <p className="mt-5 text-sm leading-8 text-slate-500 sm:text-base">
-                Solusi transportasi tidak hanya berfokus
-                pada pembangunan infrastruktur,
-                tetapi juga pada pengelolaan permintaan,
-                perilaku perjalanan, dan kualitas layanan.
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                Evaluasi dirancang menggunakan dasar
+                proyeksi permintaan dan jaringan yang
+                konsisten, sehingga perubahan indikator
+                dapat dibandingkan secara terukur.
               </p>
             </div>
           </Reveal>
 
-          <div className="grid gap-5 md:grid-cols-3">
-            {challenges.map((item, i) => {
-              const Icon = item.icon;
+          <div className="grid gap-5 md:grid-cols-2">
 
-              return (
-                <Reveal key={item.title} delay={i * 100}>
-                  <div className="feature-card h-full rounded-3xl border border-slate-200 bg-white p-8">
-                    <div className="mb-7 flex h-13 w-13 items-center justify-center rounded-2xl bg-red-50 text-[#B91C1C]">
-                      <Icon size={24} />
-                    </div>
+            {/* BEFORE TDM */}
+            <Reveal>
+              <button
+                onClick={() => onNavigate("before")}
+                className="group flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-[#FAFAFA] p-7 text-left transition-all duration-300 hover:border-slate-300 hover:shadow-md sm:p-9"
+              >
+                <div className="mb-12 flex w-full items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wide text-slate-500">
+                    MODEL 01
+                  </span>
 
-                    <h3 className="text-xl font-bold text-slate-900">
-                      {item.title}
-                    </h3>
+                  <ArrowUpRight
+                    size={20}
+                    className="text-slate-400 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1"
+                  />
+                </div>
 
-                    <p className="mt-4 text-sm leading-7 text-slate-500">
-                      {item.text}
-                    </p>
-                  </div>
-                </Reveal>
-              );
-            })}
+                <h3 className="text-2xl font-semibold text-slate-900">
+                  Business as Usual
+                </h3>
+
+                <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
+                  Proyeksi kondisi jaringan transportasi
+                  Denpasar pada 2041 tanpa tambahan
+                  intervensi TDM yang dikaji.
+                </p>
+
+                <p className="mt-auto pt-8 text-xs font-medium text-slate-400">
+                  Kerangka model — pengembangan
+                </p>
+              </button>
+            </Reveal>
+
+            {/* AFTER TDM */}
+            <Reveal delay={100}>
+              <button
+                onClick={() => onNavigate("after")}
+                className="group flex h-full w-full flex-col rounded-2xl border border-red-100 bg-[#FFF9F9] p-7 text-left transition-all duration-300 hover:border-red-200 hover:shadow-md sm:p-9"
+              >
+                <div className="mb-12 flex w-full items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wide text-[#B91C1C]">
+                    MODEL 02
+                  </span>
+
+                  <ArrowUpRight
+                    size={20}
+                    className="text-[#B91C1C] transition-transform group-hover:translate-x-1 group-hover:-translate-y-1"
+                  />
+                </div>
+
+                <h3 className="text-2xl font-semibold text-slate-900">
+                  Integrated TDM
+                </h3>
+
+                <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
+                  Proyeksi kondisi jaringan setelah
+                  penerapan kombinasi strategi pengelolaan
+                  permintaan dan peningkatan angkutan umum.
+                </p>
+
+                <p className="mt-auto pt-8 text-xs font-medium text-[#B91C1C]">
+                  Kerangka model — pengembangan
+                </p>
+              </button>
+            </Reveal>
           </div>
 
           <Reveal>
-            <div className="mt-10">
+            <div className="mt-8">
               <button
-                onClick={() => onNavigate("problems")}
-                className="group inline-flex items-center gap-2 font-semibold text-[#B91C1C]"
+                onClick={() => onNavigate("comparison")}
+                className="group inline-flex items-center gap-2 text-sm font-semibold text-[#B91C1C]"
               >
-                Explore Problem Solving
+                Kerangka Perbandingan Skenario
                 <ArrowRight
-                  size={18}
+                  size={17}
                   className="transition-transform group-hover:translate-x-1"
                 />
               </button>
@@ -243,68 +436,6 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* PROCESS */}
-      <section className="px-5 py-24 sm:px-8">
-        <div className="mx-auto max-w-7xl">
-          <Reveal>
-            <div className="mb-12 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
-                Research Workflow
-              </p>
-
-              <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-                From Data to Decisions.
-              </h2>
-            </div>
-          </Reveal>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              {
-                icon: MapPinned,
-                number: "01",
-                title: "Analyze Demand",
-                text: "Memahami pola perjalanan berdasarkan MAT 13 zona dan karakteristik jaringan.",
-              },
-              {
-                icon: SlidersHorizontal,
-                number: "02",
-                title: "Design TDM Policies",
-                text: "Menyusun kombinasi kebijakan push dan pull yang dapat diuji secara matematis.",
-              },
-              {
-                icon: Activity,
-                number: "03",
-                title: "Evaluate Performance",
-                text: "Membandingkan indikator transportasi sebelum dan sesudah intervensi.",
-              },
-            ].map((item, i) => {
-              const Icon = item.icon;
-
-              return (
-                <Reveal key={item.number} delay={i * 100}>
-                  <div className="rounded-3xl border border-slate-200 p-7">
-                    <div className="mb-8 flex items-center justify-between">
-                      <Icon size={24} className="text-[#B91C1C]" />
-                      <span className="text-sm font-bold text-slate-300">
-                        {item.number}
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-slate-900">
-                      {item.title}
-                    </h3>
-
-                    <p className="mt-3 text-sm leading-7 text-slate-500">
-                      {item.text}
-                    </p>
-                  </div>
-                </Reveal>
-              );
-            })}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
