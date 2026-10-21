@@ -1,1 +1,241 @@
 @import "tailwindcss";
+
+
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background: #ffffff;
+  color: #17202d;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #ffffff;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* HERO ENTRANCE */
+
+@keyframes heroEnter {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+    filter: blur(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.hero-enter {
+  animation: heroEnter 0.8s
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-delay-1 {
+  animation-delay: 100ms;
+}
+
+.hero-delay-2 {
+  animation-delay: 220ms;
+}
+
+.hero-delay-3 {
+  animation-delay: 340ms;
+}
+
+.hero-delay-4 {
+  animation-delay: 460ms;
+}
+
+/* SCROLL REVEAL */
+
+.reveal-item {
+  opacity: 0;
+  transform: translateY(32px);
+  transition:
+    opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-item.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* FLOATING HERO BACKGROUND */
+
+@keyframes orbFloat {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(24px, -22px);
+  }
+}
+
+.hero-orb {
+  animation: orbFloat 12s ease-in-out infinite;
+}
+
+.hero-orb-delay {
+  animation-delay: -6s;
+}
+
+/* SCROLL INDICATOR */
+
+@keyframes arrowBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(7px);
+  }
+}
+
+.scroll-arrow {
+  animation: arrowBounce 1.8s ease-in-out infinite;
+}
+
+/* FEATURE CARD */
+
+.feature-card {
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.4s ease,
+    border-color 0.4s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  border-color: #fecaca;
+  box-shadow: 0 22px 45px rgba(15, 23, 42, 0.08);
+}
+
+/* NETWORK PREVIEW GRID */
+
+.preview-grid {
+  background-image:
+    linear-gradient(
+      rgba(255,255,255,0.18) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,0.18) 1px,
+      transparent 1px
+    );
+
+  background-size: 32px 32px;
+  opacity: 0.55;
+}
+
+/* NETWORK PERSPECTIVE */
+
+.network-stage {
+  transform-origin: center center;
+  transform: perspective(1100px) rotateX(0deg) rotateZ(0deg) scale(1);
+  transition: transform 0.9s
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.network-stage.network-tilt {
+  transform:
+    perspective(1100px)
+    rotateX(20deg)
+    rotateZ(-7deg)
+    scale(1.2);
+}
+
+/* ANIMATED TRAFFIC FLOW */
+
+@keyframes routeFlow {
+  to {
+    stroke-dashoffset: -208;
+  }
+}
+
+.route-flow {
+  animation: routeFlow 5s linear infinite;
+}
+
+.route-flow-slow {
+  animation-duration: 8s;
+}
+
+/* NODE GLOW */
+
+@keyframes nodePulse {
+  0%, 100% {
+    opacity: 0.12;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.node-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nodePulse 2.5s ease-in-out infinite;
+}
+
+/* RESPONSIVE ADJUSTMENTS */
+
+@media (max-width: 640px) {
+  .network-stage.network-tilt {
+    transform:
+      perspective(900px)
+      rotateX(12deg)
+      rotateZ(-5deg)
+      scale(1.55);
+  }
+
+  .feature-card:hover {
+    transform: translateY(-3px);
+  }
+}
+
+/* ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal-item {
+    opacity: 1;
+    transform: none;
+  }
+}
+
