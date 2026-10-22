@@ -1,588 +1,1554 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
 import {
   Map as MapIcon,
-  Layers3,
-  Navigation,
-  Route,
+  CarFront,
+  Network,
   RotateCcw,
+  RefreshCw,
   Play,
   Pause,
-  AlertTriangle,
   Plus,
   Minus,
+  Layers,
+  Satellite,
+  SlidersHorizontal,
+  Info,
 } from "lucide-react";
 
+import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
+
 /*
- * Leaflet replacement for SimulationPreview.
- * No MapLibre, WebGL, or Worker URL configuration is needed.
- * Routes and vehicle movement below are illustrative, not SUMO output.
+ * DEWATAMOVE 2041 — UPDATED MAP PREVIEW
+ *
+ * Peta jalan:
+ *   OpenStreetMap, berdasarkan data yang tersedia.
+ *
+ * Peta satelit:
+ *   MapTiler, membutuhkan VITE_MAPTILER_KEY.
+ *
+ * Jaringan kendaraan:
+ *   OpenStreetMap / Overpass.
+ *
+ * Tanggal snapshot OSM diambil dari metadata
+ * jaringan, bukan tanggal yang dikarang.
+ *
+ * Simulasi kendaraan tetap ilustratif.
  */
 
-const CENTER = [-8.6705, 115.2166];
+const CITY = [-8.673, 115.216];
 
-const CORRIDORS = {
-  central: {
-    name: "Pusat Denpasar – Sanur",
-    color: "#B91C1C",
-    coordinates: [
-      [-8.6612, 115.1942], [-8.6628, 115.1990],
-      [-8.6643, 115.2053], [-8.6660, 115.2115],
-      [-8.6678, 115.2185], [-8.6700, 115.2255],
-      [-8.6724, 115.2330], [-8.6752, 115.2395],
-      [-8.6788, 115.2460], [-8.6840, 115.2510],
-      [-8.6908, 115.2550],
-    ],
-  },
-  northSouth: {
-    name: "Denpasar Utara – Selatan",
-    color: "#2563EB",
-    coordinates: [
-      [-8.6365, 115.2045], [-8.6448, 115.2055],
-      [-8.6515, 115.2073], [-8.6596, 115.2088],
-      [-8.6680, 115.2107], [-8.6776, 115.2120],
-      [-8.6862, 115.2132], [-8.6950, 115.2147],
-      [-8.7030, 115.2162],
-    ],
-  },
-  southCoast: {
-    name: "Sesetan – Mertasari",
-    color: "#D97706",
-    coordinates: [
-      [-8.6872, 115.2080], [-8.6898, 115.2145],
-      [-8.6930, 115.2208], [-8.6970, 115.2282],
-      [-8.7010, 115.2360], [-8.7060, 115.2433],
-      [-8.7112, 115.2506], [-8.7155, 115.2570],
-    ],
-  },
-};
+const DEFAULT_DENSITY = 0.85;
+const MAX_DENSITY = 1.6;
+const MAX_VEHICLES = 1900;
+const SIM_SPEED = 2.6;
 
-const STOPS = [
-  { name: "Area Terminal Ubung", coordinates: [-8.6368, 115.2052] },
-  { name: "Area Teuku Umar", coordinates: [-8.6672, 115.2102] },
-  { name: "Area Renon", coordinates: [-8.6698, 115.2280] },
-  { name: "Area Titi Banda", coordinates: [-8.6796, 115.2472] },
-  { name: "Area Mertasari", coordinates: [-8.7143, 115.2562] },
+const MAPTILER_KEY =
+  import.meta.env.VITE_MAPTILER_KEY || "";
+
+const OSM_URL =
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+const SATELLITE_URL =
+  "https://api.maptiler.com/tiles/satellite-v4/{z}/{x}/{y}?key=" +
+  encodeURIComponent(MAPTILER_KEY);
+
+const SPEEDS = [50, 45, 38, 32, 28, 23, 18, 12, 8];
+
+const DENSITIES = [
+  9, 12, 18, 13, 8.5, 5.5, 2.4, 1, 0.35,
 ];
 
-const VEHICLES = [
-  { id: "bus-1", type: "bus", route: "central", color: "#FFFFFF", speed: 0.0013, offset: 0.08 },
-  { id: "bus-2", type: "bus", route: "northSouth", color: "#FFFFFF", speed: 0.0012, offset: 0.57 },
-  { id: "car-1", type: "car", route: "central", color: "#DC2626", speed: 0.0017, offset: 0.21 },
-  { id: "car-2", type: "car", route: "central", color: "#2563EB", speed: 0.0018, offset: 0.64 },
-  { id: "car-3", type: "car", route: "northSouth", color: "#F8FAFC", speed: 0.0016, offset: 0.12 },
-  { id: "car-4", type: "car", route: "southCoast", color: "#F59E0B", speed: 0.0016, offset: 0.37 },
-  { id: "car-5", type: "car", route: "northSouth", color: "#475569", speed: 0.0015, offset: 0.83 },
-  { id: "feeder-1", type: "feeder", route: "southCoast", color: "#FDE68A", speed: 0.0014, offset: 0.70 },
-  { id: "motor-1", type: "motor", route: "central", color: "#111827", speed: 0.0020, offset: 0.38 },
-  { id: "motor-2", type: "motor", route: "northSouth", color: "#1D4ED8", speed: 0.0021, offset: 0.75 },
-  { id: "motor-3", type: "motor", route: "southCoast", color: "#E11D48", speed: 0.0020, offset: 0.15 },
+const COLORS = [
+  "#f8fafc",
+  "#e2e8f0",
+  "#334155",
+  "#64748b",
+  "#b91c1c",
+  "#2563eb",
+  "#0f766e",
+  "#d9a024",
 ];
 
-function segmentDistance(a, b) {
-  const meanLat = ((a[0] + b[0]) / 2) * Math.PI / 180;
-  return Math.hypot(
-    b[0] - a[0],
-    (b[1] - a[1]) * Math.cos(meanLat)
+const clamp = (value, min, max) =>
+  Math.max(min, Math.min(max, value));
+
+const fmt = (value) =>
+  Math.round(value || 0).toLocaleString("id-ID");
+
+function hash(number) {
+  let x = Math.floor(number) | 0;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+function zoneIcon(id, active) {
+  return L.divIcon({
+    className: "dm-zone-icon",
+    html: `
+      <span class="${active ? "active" : ""}">
+        ${id}
+      </span>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+/*
+ * Ukuran kendaraan semakin kecil saat zoom out.
+ */
+function vehicleScale(zoom) {
+  return clamp(
+    Math.pow(2, (zoom - 16) * 0.38) * 0.7,
+    0.16,
+    1.25
   );
 }
 
-function buildRouteInfo(coordinates) {
-  const cumulative = [0];
-  for (let i = 1; i < coordinates.length; i += 1) {
-    cumulative.push(
-      cumulative[i - 1] + segmentDistance(coordinates[i - 1], coordinates[i])
-    );
+function drawVehicle(ctx, car, scale) {
+  const s = scale;
+
+  if (car.type === "motor") {
+    ctx.fillStyle = "#17202e";
+    ctx.fillRect(-5 * s, -1.4 * s, 10 * s, 2.8 * s);
+
+    ctx.fillStyle = car.color;
+    ctx.fillRect(-2 * s, -1.8 * s, 4 * s, 3.6 * s);
+    return;
   }
-  return { cumulative, total: cumulative[cumulative.length - 1] };
+
+  if (car.type === "bus") {
+    ctx.fillStyle = "#243244";
+    ctx.fillRect(-11 * s, -4 * s, 22 * s, 8 * s);
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(-10 * s, -3.2 * s, 20 * s, 6.4 * s);
+
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(-6 * s, -2.4 * s, 12 * s, 4 * s);
+
+    ctx.fillStyle = "#b91c1c";
+    ctx.fillRect(-9 * s, 2 * s, 18 * s, 1 * s);
+    return;
+  }
+
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(-7 * s, -3.2 * s, 14 * s, 6.4 * s);
+
+  ctx.fillStyle = car.color;
+  ctx.fillRect(-6.3 * s, -2.7 * s, 12.6 * s, 5.4 * s);
+
+  ctx.fillStyle = "#9bc5d8";
+  ctx.fillRect(1.6 * s, -2.1 * s, 2.5 * s, 4.2 * s);
 }
 
-const ROUTE_INFO = Object.fromEntries(
-  Object.entries(CORRIDORS).map(([id, route]) => [
-    id,
-    buildRouteInfo(route.coordinates),
-  ])
-);
+function makeCar(edgeId, index, count, edge) {
+  const seed = edgeId * 997 + index * 73;
+  const roadType = clamp(edge[3] | 0, 0, 8);
+  const random = hash(seed);
 
-function positionOnRoute(routeId, progress) {
-  const coords = CORRIDORS[routeId].coordinates;
-  const info = ROUTE_INFO[routeId];
-  const target = Math.max(0, Math.min(1, progress)) * info.total;
-  let i = 0;
+  const type =
+    random < 0.67
+      ? "motor"
+      : random < (roadType <= 4 ? 0.96 : 1)
+        ? "car"
+        : "bus";
 
-  while (i < coords.length - 2 && target > info.cumulative[i + 1]) i += 1;
+  const modeFactor =
+    type === "motor" ? 1.07 :
+    type === "bus" ? 0.8 : 1;
 
-  const a = coords[i];
-  const b = coords[i + 1];
-  const start = info.cumulative[i];
-  const end = info.cumulative[i + 1];
-  const t = (target - start) / Math.max(end - start, 1e-10);
-  const lat = a[0] + (b[0] - a[0]) * t;
-  const lng = a[1] + (b[1] - a[1]) * t;
-  const dx = (b[1] - a[1]) * Math.cos(lat * Math.PI / 180);
-  const dy = b[0] - a[0];
+  const desiredSpeed =
+    (SPEEDS[roadType] / 3.6) *
+    (0.82 + hash(seed + 13) * 0.35) *
+    modeFactor;
 
   return {
-    coordinates: [lat, lng],
-    bearing: Math.atan2(dx, dy) * 180 / Math.PI,
+    edge: edgeId,
+    t: (index + 0.5) / count,
+    type,
+    color:
+      COLORS[Math.floor(hash(seed + 3) * COLORS.length)],
+    length:
+      type === "motor" ? 2 :
+      type === "bus" ? 10 : 4.5,
+    desiredSpeed,
+    speed: desiredSpeed * 0.8,
+    minGap: 2 + hash(seed + 38) * 2,
+    visibility: hash(seed + 823),
+    seed,
+    state: "driving",
+    opacity: 1,
   };
 }
 
-function vehiclePosition(vehicle, elapsed) {
-  // Ping-pong movement prevents a vehicle teleporting to the route start.
-  const cycle = ((vehicle.offset + elapsed * vehicle.speed) % 2 + 2) % 2;
-  const forward = cycle <= 1;
-  const point = positionOnRoute(vehicle.route, forward ? cycle : 2 - cycle);
-  return { ...point, bearing: forward ? point.bearing : point.bearing + 180 };
+function edgeAngle(graph, edge) {
+  const a = graph.nodes[edge[0]];
+  const b = graph.nodes[edge[1]];
+
+  const cosine = Math.cos(
+    ((a[0] + b[0]) * Math.PI) / 360
+  );
+
+  return Math.atan2(
+    b[0] - a[0],
+    (b[1] - a[1]) * cosine
+  );
 }
 
-function vehicleSvg(vehicle) {
-  const color = vehicle.color;
+/*
+ * Pilih ruas yang memang terhubung.
+ * Prioritaskan arah lurus.
+ */
+function nextRoad(car, current, graph, adjacency, flowKey) {
+  const outgoing = adjacency[current[1]] || [];
 
-  if (vehicle.type === "bus") {
-    return `<svg viewBox="0 0 84 34" width="100%" height="100%" aria-hidden="true">
-      <rect x="1" y="2" width="82" height="30" rx="5" fill="#26323D"/>
-      <rect x="3" y="3" width="78" height="28" rx="5" fill="#FFFFFF"/>
-      <rect x="10" y="7" width="55" height="19" rx="3" fill="#D5E1E6"/>
-      <rect x="13" y="9" width="13" height="15" rx="2" fill="#334155"/>
-      <rect x="29" y="9" width="13" height="15" rx="2" fill="#334155"/>
-      <rect x="45" y="9" width="13" height="15" rx="2" fill="#334155"/>
-      <rect x="68" y="8" width="9" height="18" rx="2" fill="#334155"/>
-      <rect x="4" y="27" width="76" height="4" rx="1" fill="#B91C1C"/>
-      <rect x="77" y="8" width="3" height="5" rx="1" fill="#FEF3C7"/>
-      <rect x="77" y="21" width="3" height="5" rx="1" fill="#FEF3C7"/>
-    </svg>`;
+  if (!outgoing.length) return null;
+
+  const noTurnBack = outgoing.filter(
+    (index) => graph.edges[index][1] !== current[0]
+  );
+
+  const choices = noTurnBack.length
+    ? noTurnBack
+    : outgoing;
+
+  const oldAngle = edgeAngle(graph, current);
+
+  const p95 = Math.max(
+    1,
+    graph.metadata?.visualP95 || 1
+  );
+
+  let sum = 0;
+
+  const weighted = choices.map((index) => {
+    const edge = graph.edges[index];
+    const angle = edgeAngle(graph, edge);
+
+    const turn = Math.abs(
+      Math.atan2(
+        Math.sin(angle - oldAngle),
+        Math.cos(angle - oldAngle)
+      )
+    );
+
+    const direction =
+      turn < 0.45 ? 3 :
+      turn < 1.3 ? 1.5 : 0.65;
+
+    const flow = Math.max(0, edge[flowKey] || 0);
+
+    sum += direction *
+      (0.8 + Math.min(1, Math.sqrt(flow / p95) * 0.6));
+
+    return [index, sum];
+  });
+
+  car.seed += 37;
+
+  const roll = hash(car.seed) * sum;
+
+  return (
+    weighted.find((item) => roll <= item[1])?.[0] ??
+    weighted[weighted.length - 1][0]
+  );
+}
+
+function formatSnapshot(value) {
+  if (!value) return "Belum tersedia";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Belum tersedia";
   }
 
-  if (vehicle.type === "motor") {
-    return `<svg viewBox="0 0 42 22" width="100%" height="100%" aria-hidden="true">
-      <ellipse cx="7" cy="12" rx="6" ry="4" fill="#111827"/>
-      <ellipse cx="35" cy="12" rx="6" ry="4" fill="#111827"/>
-      <path d="M8 12 L15 8 L27 8 L34 12" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"/>
-      <rect x="15" y="5" width="12" height="9" rx="4" fill="${color}"/>
-      <circle cx="21" cy="9" r="3" fill="#334155"/>
-    </svg>`;
-  }
-
-  const feeder = vehicle.type === "feeder";
-  return `<svg viewBox="0 0 70 34" width="100%" height="100%" aria-hidden="true">
-    <rect x="2" y="3" width="66" height="28" rx="${feeder ? 6 : 9}" fill="#26323D"/>
-    <rect x="4" y="4" width="62" height="26" rx="${feeder ? 5 : 8}" fill="${color}"/>
-    <rect x="17" y="7" width="36" height="19" rx="5" fill="#334155"/>
-    <rect x="21" y="9" width="11" height="15" rx="2" fill="#83A7B8"/>
-    <rect x="38" y="9" width="11" height="15" rx="2" fill="#83A7B8"/>
-    ${feeder ? '<rect x="5" y="26" width="60" height="3" fill="#B91C1C"/>' : ""}
-    <rect x="64" y="9" width="3" height="5" rx="1" fill="#FEF3C7"/>
-    <rect x="64" y="21" width="3" height="5" rx="1" fill="#FEF3C7"/>
-  </svg>`;
+  return date.toLocaleString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Makassar",
+  }) + " WITA";
 }
 
-function makeVehicleIcon(vehicle, bearing = 0) {
-  const sizes = {
-    bus: [46, 20],
-    car: [29, 16],
-    feeder: [35, 18],
-    motor: [19, 11],
-  };
-  const [width, height] = sizes[vehicle.type];
-
-  return L.divIcon({
-    className: "denpasar-vehicle-icon",
-    iconSize: [width, height],
-    iconAnchor: [width / 2, height / 2],
-    html: `<div class="denpasar-vehicle-art"
-      style="width:${width}px;height:${height}px;transform:rotate(${bearing - 90}deg)">
-      ${vehicleSvg(vehicle)}
-    </div>`,
-  });
-}
-
-function makeStopIcon() {
-  return L.divIcon({
-    className: "denpasar-stop-icon",
-    iconSize: [17, 17],
-    iconAnchor: [8.5, 8.5],
-    html: `<div style="width:15px;height:15px;border:3px solid #B91C1C;
-      border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.22)"></div>`,
-  });
-}
-
-const buttonClass = (active) =>
-  `inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-    active ? "bg-[#B91C1C] text-white" : "bg-white/10 text-white hover:bg-white/20"
-  }`;
-
-export default function SimulationPreview() {
-  const containerRef = useRef(null);
+export default function SimulationPreview({
+  initialScenario = "before",
+  showScenarioControls = false,
+}) {
+  const mapDiv = useRef(null);
+  const canvasRef = useRef(null);
   const mapRef = useRef(null);
-  const vehicleMarkersRef = useRef([]);
-  const stopMarkersRef = useRef([]);
-  const routeGroupRef = useRef(null);
-  const frameRef = useRef(null);
-  const elapsedRef = useRef(0);
+  const baseLayerRef = useRef(null);
 
-  const [status, setStatus] = useState("loading");
-  const [error, setError] = useState("");
-  const [mode, setMode] = useState("overview");
-  const [traffic, setTraffic] = useState(true);
-  const [playing, setPlaying] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const markersRef = useRef({});
+  const odRef = useRef(null);
+  const heatRefreshRef = useRef(() => {});
+
+  const simulationRef = useRef({
+    graph: null,
+    cars: [],
+    adjacency: [],
+    spawnEdges: [],
+    heat: null,
   });
 
-  // Initialize Leaflet and OpenStreetMap tiles.
+  const settingsRef = useRef({});
+
+  const [network, setNetwork] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const [basemap, setBasemap] = useState("jalan");
+  const [scenario, setScenario] = useState(initialScenario);
+  const [density, setDensity] = useState(DEFAULT_DENSITY);
+
+  const [playing, setPlaying] = useState(true);
+  const [showHeat, setShowHeat] = useState(false);
+  const [showOD, setShowOD] = useState(false);
+
+  const [mode, setMode] = useState("zones");
+  const [origin, setOrigin] = useState("Z11");
+  const [destination, setDestination] = useState("Z03");
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  settingsRef.current = {
+    scenario,
+    density,
+    playing,
+    showHeat,
+  };
+
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return undefined;
+    setScenario(initialScenario);
+  }, [initialScenario]);
+
+  /*
+   * INISIALISASI LEAFLET
+   */
+  useEffect(() => {
+    if (!mapDiv.current || mapRef.current) return;
 
     let disposed = false;
-    let tileLoaded = false;
-    let loadTimeout = null;
-    let resizeObserver;
-    let map;
+    let observer = null;
+    let frameId = null;
+    let lastFrame = null;
+    let lastCount = 0;
 
-    try {
-      map = L.map(containerRef.current, {
-        center: CENTER,
-        zoom: 12.5,
-        zoomControl: false,
-        scrollWheelZoom: false,
-        preferCanvas: true,
-      });
-      mapRef.current = map;
-      L.control.zoom({ position: "topright" }).addTo(map);
+    const map = L.map(mapDiv.current, {
+      center: CITY,
+      zoom: 12,
+      minZoom: 10,
+      maxZoom: 19,
+      zoomControl: false,
+      scrollWheelZoom: true,
+      zoomSnap: 0.5,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 120,
+      zoomAnimation: false,
+      fadeAnimation: false,
+      markerZoomAnimation: false,
+      preferCanvas: true,
+    });
 
-      const tiles = L.tileLayer(
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        {
-          maxZoom: 19,
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }
-      ).addTo(map);
+    mapRef.current = map;
 
-      tiles.on("load", () => {
-        tileLoaded = true;
-        if (loadTimeout) window.clearTimeout(loadTimeout);
-        if (!disposed) {
-          setError("");
-          setStatus("ready");
-        }
-      });
+    function resizeCanvas() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-      tiles.on("tileerror", () => {
-        if (!disposed && !tileLoaded) {
-          setError("Tile peta belum berhasil dimuat. Periksa koneksi internet atau coba muat ulang.");
-        }
-      });
+      const size = map.getSize();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
 
-      loadTimeout = window.setTimeout(() => {
-        if (!disposed && !tileLoaded) {
-          setError("Peta belum berhasil dimuat dalam 15 detik. Periksa koneksi internet atau akses layanan OpenStreetMap.");
-          setStatus("error");
-        }
-      }, 15000);
+      const w = Math.max(1, Math.round(size.x * dpr));
+      const h = Math.max(1, Math.round(size.y * dpr));
 
-      const routeGroup = L.layerGroup();
-      Object.values(CORRIDORS).forEach((corridor) => {
-        L.polyline(corridor.coordinates, {
-          color: "#FFFFFF",
-          weight: 7,
-          opacity: 0.88,
-          lineCap: "round",
-          lineJoin: "round",
-          interactive: false,
-        }).addTo(routeGroup);
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
 
-        L.polyline(corridor.coordinates, {
-          color: corridor.color,
-          weight: 3.5,
-          opacity: 0.9,
-          lineCap: "round",
-          lineJoin: "round",
-          interactive: false,
-        }).addTo(routeGroup);
-      });
-      routeGroup.addTo(map);
-      routeGroupRef.current = routeGroup;
+      canvas.style.width = `${size.x}px`;
+      canvas.style.height = `${size.y}px`;
+    }
 
-      STOPS.forEach((stop) => {
-        const marker = L.marker(stop.coordinates, {
-          icon: makeStopIcon(),
-          title: stop.name,
-          zIndexOffset: 500,
-        })
-          .bindPopup(
-            `<strong>${stop.name}</strong><br/><span style="font-size:12px">Titik referensi ilustratif, bukan verifikasi halte resmi.</span>`
-          )
-          .addTo(map);
+    /*
+     * GAMBAR HEATMAP BERDASARKAN MAT
+     */
+    function buildHeat() {
+      const graph = simulationRef.current.graph;
 
-        const element = marker.getElement();
-        if (element) {
-          element.style.background = "transparent";
-          element.style.border = "0";
-        }
-        stopMarkersRef.current.push(marker);
-      });
-
-      VEHICLES.forEach((vehicle) => {
-        const point = vehiclePosition(vehicle, elapsedRef.current);
-        const marker = L.marker(point.coordinates, {
-          icon: makeVehicleIcon(vehicle, point.bearing),
-          interactive: false,
-          keyboard: false,
-          zIndexOffset:
-            vehicle.type === "bus" ? 400 :
-            vehicle.type === "feeder" ? 300 :
-            vehicle.type === "car" ? 200 : 100,
-        }).addTo(map);
-
-        const element = marker.getElement();
-        if (element) {
-          element.style.background = "transparent";
-          element.style.border = "0";
-          element.style.pointerEvents = "none";
-          element.style.filter = "drop-shadow(0 2px 3px rgba(15,23,42,.25))";
-        }
-        vehicleMarkersRef.current.push({ marker, vehicle });
-      });
-
-      resizeObserver = typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => {
-            if (!disposed && mapRef.current) {
-              mapRef.current.invalidateSize({ pan: false });
-            }
-          })
-        : null;
-
-      if (resizeObserver && containerRef.current) {
-        resizeObserver.observe(containerRef.current);
+      if (!graph || !settingsRef.current.showHeat) {
+        simulationRef.current.heat = null;
+        return;
       }
 
-      requestAnimationFrame(() => {
-        if (!disposed) map.invalidateSize();
-      });
-    } catch (err) {
-      console.error("[Denpasar Leaflet]", err);
-      setError(err?.message || "Gagal menginisialisasi peta.");
-      setStatus("error");
+      const size = map.getSize();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
+
+      const off = document.createElement("canvas");
+      off.width = Math.round(size.x * dpr);
+      off.height = Math.round(size.y * dpr);
+
+      const ctx = off.getContext("2d");
+      if (!ctx) return;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const bounds = map.getBounds().pad(0.1);
+      const flowKey =
+        settingsRef.current.scenario === "after" ? 5 : 4;
+
+      const p95 = Math.max(
+        1,
+        graph.metadata?.visualP95 || 1
+      );
+
+      for (const edge of graph.edges) {
+        const a = graph.nodes[edge[0]];
+        const b = graph.nodes[edge[1]];
+
+        if (
+          Math.max(a[0], b[0]) < bounds.getSouth() ||
+          Math.min(a[0], b[0]) > bounds.getNorth() ||
+          Math.max(a[1], b[1]) < bounds.getWest() ||
+          Math.min(a[1], b[1]) > bounds.getEast()
+        ) {
+          continue;
+        }
+
+        const flow = Math.max(0, edge[flowKey] || 0);
+        if (!flow) continue;
+
+        const strength = Math.sqrt(
+          clamp(flow / p95, 0, 3)
+        );
+
+        const p = map.latLngToContainerPoint(a);
+        const q = map.latLngToContainerPoint(b);
+
+        ctx.strokeStyle =
+          strength > 1
+            ? "rgba(185,28,28,.55)"
+            : strength > 0.45
+              ? "rgba(234,117,31,.40)"
+              : "rgba(234,179,8,.25)";
+
+        ctx.lineWidth = clamp(
+          1 + strength * 2.3, 1, 5
+        );
+
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+      }
+
+      simulationRef.current.heat = off;
     }
+
+    heatRefreshRef.current = buildHeat;
+
+    /*
+     * MEMBUAT KENDARAAN HANYA SEKALI
+     */
+    function initializeCars(graph) {
+      const p95 = Math.max(
+        1,
+        graph.metadata?.visualP95 || 1
+      );
+
+      const plans = [];
+      let total = 0;
+
+      graph.edges.forEach((edge, index) => {
+        if (edge[2] < 7) return;
+
+        const type = clamp(edge[3] | 0, 0, 8);
+        const flow = Math.max(0, edge[4] || 0);
+
+        const intensity = Math.sqrt(
+          clamp(flow / p95, 0, 4)
+        );
+
+        const demand =
+          (edge[2] / 1000) *
+          DENSITIES[type] *
+          (0.45 + Math.min(1.7, intensity * 0.9)) *
+          MAX_DENSITY;
+
+        const cap = Math.max(
+          1,
+          Math.floor(edge[2] / (type <= 3 ? 16 : 23))
+        );
+
+        const expected = Math.min(demand, cap);
+
+        if (expected > 0) {
+          plans.push([index, expected]);
+          total += expected;
+        }
+      });
+
+      const factor = Math.min(
+        1,
+        MAX_VEHICLES / Math.max(total, 1)
+      );
+
+      const cars = [];
+
+      for (const [index, expected] of plans) {
+        const amount = expected * factor;
+
+        const count =
+          Math.floor(amount) +
+          (hash(index * 31 + 9) < amount % 1 ? 1 : 0);
+
+        for (let i = 0; i < count; i++) {
+          cars.push(
+            makeCar(index, i, count, graph.edges[index])
+          );
+        }
+      }
+
+      simulationRef.current.cars =
+        cars.length <= MAX_VEHICLES
+          ? cars
+          : Array.from(
+              { length: MAX_VEHICLES },
+              (_, i) =>
+                cars[Math.floor(i * cars.length / MAX_VEHICLES)]
+            );
+
+      simulationRef.current.spawnEdges =
+        plans.map(([index]) => index);
+    }
+
+    /*
+     * PERGERAKAN DAN PERILAKU KENDARAAN
+     */
+    function simulate(dt) {
+      const scene = simulationRef.current;
+      const graph = scene.graph;
+
+      if (!graph || dt <= 0) return;
+
+      const flowKey =
+        settingsRef.current.scenario === "after" ? 5 : 4;
+
+      const groups = new Map();
+
+      for (const car of scene.cars) {
+        if (car.state !== "driving") continue;
+
+        if (!groups.has(car.edge)) {
+          groups.set(car.edge, []);
+        }
+
+        groups.get(car.edge).push({
+          car,
+          t: car.t,
+        });
+      }
+
+      for (const group of groups.values()) {
+        group.sort((a, b) => b.t - a.t);
+      }
+
+      for (const group of groups.values()) {
+        for (let i = 0; i < group.length; i++) {
+          const car = group[i].car;
+          let edge = graph.edges[car.edge];
+
+          if (!edge) continue;
+
+          const length = Math.max(edge[2], 0.5);
+          let target = car.desiredSpeed;
+
+          // Mengikuti kendaraan di depan.
+          if (i > 0) {
+            const leader = group[i - 1];
+
+            const gap =
+              (leader.t - group[i].t) * length -
+              leader.car.length -
+              car.minGap;
+
+            const safeSpeed = Math.sqrt(
+              Math.max(0, 5 * gap)
+            );
+
+            target = Math.min(target, safeSpeed);
+          }
+
+          // Perlambatan ringan di persimpangan.
+          const toEnd = (1 - car.t) * length;
+          const exits = scene.adjacency[edge[1]] || [];
+
+          if (exits.length > 2 && toEnd < 18) {
+            target = Math.min(
+              target,
+              7 + (toEnd / 18) * 5
+            );
+          }
+
+          const acceleration = clamp(
+            (target - car.speed) * 1.8,
+            -4,
+            2.4
+          );
+
+          car.speed = clamp(
+            car.speed + acceleration * dt,
+            0,
+            car.desiredSpeed
+          );
+
+          let travel = car.speed * dt;
+
+          for (
+            let hops = 0;
+            travel > 0.0001 && hops < 16;
+            hops++
+          ) {
+            const roadLength = Math.max(edge[2], 0.5);
+            const remaining = (1 - car.t) * roadLength;
+
+            if (travel < remaining) {
+              car.t += travel / roadLength;
+              travel = 0;
+              break;
+            }
+
+            travel -= remaining;
+
+            const next = nextRoad(
+              car,
+              edge,
+              graph,
+              scene.adjacency,
+              flowKey
+            );
+
+            if (next == null) {
+              car.t = 0.9999;
+              car.speed = 0;
+              car.state = "exiting";
+              travel = 0;
+              break;
+            }
+
+            car.edge = next;
+            car.t = 0;
+            edge = graph.edges[next];
+          }
+
+          car.t = clamp(car.t, 0, 0.9999);
+        }
+      }
+
+      /*
+       * Perjalanan yang selesai memudar.
+       * Perjalanan baru muncul dengan fade-in
+       * setelah kendaraan lama tidak terlihat.
+       */
+      for (const car of scene.cars) {
+        if (car.state === "exiting") {
+          car.opacity = Math.max(0, car.opacity - dt * 1.3);
+
+          if (car.opacity === 0 && scene.spawnEdges.length) {
+            car.seed += 163;
+
+            const index = Math.floor(
+              hash(car.seed) * scene.spawnEdges.length
+            );
+
+            car.edge = scene.spawnEdges[index];
+            car.t = 0.01;
+            car.speed = car.desiredSpeed * 0.6;
+            car.state = "entering";
+          }
+        } else if (car.state === "entering") {
+          car.opacity = Math.min(1, car.opacity + dt * 0.8);
+
+          if (car.opacity >= 1) {
+            car.state = "driving";
+          }
+        }
+      }
+    }
+
+    /*
+     * GAMBAR MOBIL SESUAI ZOOM.
+     *
+     * Tidak ada reset mobil saat zoom/pan.
+     */
+    function drawCars() {
+      const scene = simulationRef.current;
+      const graph = scene.graph;
+      const canvas = canvasRef.current;
+
+      if (!graph || !canvas) return 0;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return 0;
+
+      const size = map.getSize();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, size.x, size.y);
+
+      if (settingsRef.current.showHeat && scene.heat) {
+        ctx.drawImage(scene.heat, 0, 0, size.x, size.y);
+      }
+
+      const zoom = map.getZoom();
+      const scale = vehicleScale(zoom);
+
+      const laneGap = clamp(
+        (zoom - 13) * 1.25,
+        0,
+        6
+      );
+
+      const threshold =
+        settingsRef.current.density / MAX_DENSITY;
+
+      const projections = new Map();
+
+      let visible = 0;
+
+      for (const car of scene.cars) {
+        if (
+          car.visibility > threshold ||
+          car.opacity <= 0
+        ) {
+          continue;
+        }
+
+        let line = projections.get(car.edge);
+
+        if (!line) {
+          const edge = graph.edges[car.edge];
+          if (!edge) continue;
+
+          const a = map.latLngToContainerPoint(
+            graph.nodes[edge[0]]
+          );
+
+          const b = map.latLngToContainerPoint(
+            graph.nodes[edge[1]]
+          );
+
+          line = [a.x, a.y, b.x, b.y];
+
+          projections.set(car.edge, line);
+        }
+
+        const dx = line[2] - line[0];
+        const dy = line[3] - line[1];
+        const length = Math.hypot(dx, dy);
+
+        if (length < 0.01) continue;
+
+        // Posisi relatif sisi kiri jalan Indonesia.
+        const x =
+          line[0] +
+          dx * car.t +
+          (dy / length) * laneGap;
+
+        const y =
+          line[1] +
+          dy * car.t -
+          (dx / length) * laneGap;
+
+        if (
+          x < -20 ||
+          y < -20 ||
+          x > size.x + 20 ||
+          y > size.y + 20
+        ) {
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = car.opacity;
+
+        if (zoom <= 13) {
+          const radius = clamp(
+            0.75 + (zoom - 11) * 0.22,
+            0.6,
+            1.3
+          );
+
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = car.color;
+          ctx.fill();
+        } else {
+          ctx.translate(x, y);
+          ctx.rotate(Math.atan2(dy, dx));
+          drawVehicle(ctx, car, scale);
+        }
+
+        ctx.restore();
+        visible++;
+      }
+
+      return visible;
+    }
+
+    /*
+     * FRAME ANIMASI
+     */
+    function frame(now) {
+      if (disposed) return;
+
+      const dt =
+        lastFrame == null
+          ? 0
+          : clamp((now - lastFrame) / 1000, 0, 0.06);
+
+      lastFrame = now;
+
+      if (
+        settingsRef.current.playing &&
+        simulationRef.current.graph
+      ) {
+        let remaining = dt * SIM_SPEED;
+
+        while (remaining > 0.0001) {
+          const step = Math.min(remaining, 0.065);
+          simulate(step);
+          remaining -= step;
+        }
+      }
+
+      const count = drawCars();
+
+      if (now - lastCount > 800) {
+        lastCount = now;
+        setVisibleCount(count);
+      }
+
+      frameId = requestAnimationFrame(frame);
+    }
+
+    function viewportChanged() {
+      resizeCanvas();
+      buildHeat();
+      drawCars();
+    }
+
+    map.on("moveend zoomend", viewportChanged);
+
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        if (disposed) return;
+
+        map.invalidateSize({ pan: false });
+        viewportChanged();
+      });
+
+      observer.observe(mapDiv.current);
+    }
+
+    resizeCanvas();
+
+    /*
+     * AMBIL JARINGAN OSM
+     */
+    (async () => {
+      try {
+        const graph = await getDenpasarNetwork();
+
+        if (disposed) return;
+
+        if (
+          graph?.format !== 1 ||
+          !graph.nodes?.length ||
+          !graph.edges?.length
+        ) {
+          throw new Error("Format jaringan jalan tidak valid.");
+        }
+
+        const adjacency = Array.from(
+          { length: graph.nodes.length },
+          () => []
+        );
+
+        graph.edges.forEach((edge, index) => {
+          adjacency[edge[0]].push(index);
+        });
+
+        simulationRef.current.graph = graph;
+        simulationRef.current.adjacency = adjacency;
+
+        initializeCars(graph);
+
+        for (const zone of graph.zones || []) {
+          const marker = L.marker(
+            [zone.lat, zone.lng],
+            {
+              icon: zoneIcon(zone.id, false),
+              title: `${zone.id} — ${zone.name}`,
+            }
+          ).addTo(map);
+
+          marker.bindTooltip(
+            `${zone.id} — ${zone.name}`
+          );
+
+          marker.on("click", () => setOrigin(zone.id));
+          markersRef.current[zone.id] = marker;
+        }
+
+        setNetwork(graph);
+        setLoading(false);
+        setError("");
+
+        if (graph.zones?.length) {
+          map.fitBounds(
+            graph.zones.map((zone) => [
+              zone.lat,
+              zone.lng,
+            ]),
+            {
+              padding: [35, 35],
+              maxZoom: 12,
+              animate: false,
+            }
+          );
+        }
+
+        viewportChanged();
+      } catch (err) {
+        if (disposed) return;
+
+        setError(
+          "Gagal memuat jaringan jalan: " + err.message
+        );
+
+        setLoading(false);
+      }
+    })();
+
+    frameId = requestAnimationFrame(frame);
 
     return () => {
       disposed = true;
-      if (loadTimeout) window.clearTimeout(loadTimeout);
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+
+      if (frameId != null) {
+        cancelAnimationFrame(frameId);
       }
-      resizeObserver?.disconnect();
-      vehicleMarkersRef.current.forEach(({ marker }) => marker.remove());
-      stopMarkersRef.current.forEach((marker) => marker.remove());
-      vehicleMarkersRef.current = [];
-      stopMarkersRef.current = [];
-      routeGroupRef.current = null;
-      if (map) map.remove();
+
+      observer?.disconnect();
+      map.off("moveend zoomend", viewportChanged);
+      map.remove();
+
       mapRef.current = null;
+      baseLayerRef.current = null;
+      markersRef.current = {};
+      odRef.current = null;
+      heatRefreshRef.current = () => {};
+
+      simulationRef.current = {
+        graph: null,
+        cars: [],
+        adjacency: [],
+        spawnEdges: [],
+        heat: null,
+      };
     };
   }, []);
 
-  // Leaflet is 2D. The overview and POV modes change zoom and follow position.
+  /*
+   * PILIH LAPISAN PETA.
+   *
+   * Jalan dan Kontras menggunakan tile OSM.
+   * Kontras hanya mengubah tampilannya.
+   */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || status !== "ready") return;
+    if (!map) return;
 
-    if (mode === "2d") {
-      map.flyTo(CENTER, 11.8, { duration: 0.7 });
-    } else if (mode === "overview") {
-      map.flyTo(CENTER, 13, { duration: 0.7 });
-    } else if (mode === "pov") {
-      const car = VEHICLES.find((item) => item.id === "car-1");
-      if (car) {
-        const point = vehiclePosition(car, elapsedRef.current);
-        map.flyTo(point.coordinates, 16.5, { duration: 0.8 });
+    const satellite = basemap === "satelit" && MAPTILER_KEY;
+
+    const newLayer = L.tileLayer(
+      satellite ? SATELLITE_URL : OSM_URL,
+      {
+        maxZoom: 19,
+        attribution: satellite
+          ? '&copy; <a href="https://www.maptiler.com/">MapTiler</a>'
+          : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }
-    }
-  }, [mode, status]);
+    );
 
-  // Toggle illustrative corridors and moving vehicles.
+    newLayer.addTo(map);
+
+    if (baseLayerRef.current) {
+      map.removeLayer(baseLayerRef.current);
+    }
+
+    baseLayerRef.current = newLayer;
+
+    newLayer.bringToBack();
+  }, [basemap]);
+
+  /*
+   * PERBARUI HEATMAP SAJA.
+   */
+  useEffect(() => {
+    heatRefreshRef.current();
+  }, [showHeat, scenario]);
+
+  /*
+   * MARKER DAN GARIS OD.
+   */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || status !== "ready") return;
+    if (!map || !network) return;
 
-    vehicleMarkersRef.current.forEach(({ marker }) => {
-      const element = marker.getElement();
-      if (element) element.style.display = traffic ? "" : "none";
-    });
-
-    const group = routeGroupRef.current;
-    if (group) {
-      if (traffic && !map.hasLayer(group)) group.addTo(map);
-      if (!traffic && map.hasLayer(group)) map.removeLayer(group);
+    if (odRef.current) {
+      map.removeLayer(odRef.current);
+      odRef.current = null;
     }
-  }, [traffic, status]);
 
-  // Animate the demo vehicles.
-  useEffect(() => {
-    if (status !== "ready" || !playing) return undefined;
+    for (const zone of network.zones) {
+      markersRef.current[zone.id]?.setIcon(
+        zoneIcon(
+          zone.id,
+          zone.id === origin ||
+          zone.id === destination
+        )
+      );
+    }
 
-    let previousTime = null;
-    let lastMarkerUpdate = 0;
-    let lastCameraUpdate = 0;
+    if (!showOD) return;
 
-    const animate = (time) => {
-      if (previousTime === null) previousTime = time;
-      const delta = Math.min((time - previousTime) / 1000, 0.1);
-      previousTime = time;
-      elapsedRef.current += delta;
+    const a = network.zones.find(
+      (zone) => zone.id === origin
+    );
 
-      if (time - lastMarkerUpdate >= 40) {
-        lastMarkerUpdate = time;
-        let followed = null;
+    const b = network.zones.find(
+      (zone) => zone.id === destination
+    );
 
-        vehicleMarkersRef.current.forEach(({ marker, vehicle }) => {
-          const point = vehiclePosition(vehicle, elapsedRef.current);
-          marker.setLatLng(point.coordinates);
-
-          const artwork = marker.getElement()?.querySelector(".denpasar-vehicle-art");
-          if (artwork) {
-            artwork.style.transform = `rotate(${point.bearing - 90}deg)`;
-          }
-          if (vehicle.id === "car-1") followed = point;
-        });
-
-        if (mode === "pov" && followed && time - lastCameraUpdate >= 120) {
-          lastCameraUpdate = time;
-          mapRef.current?.panTo(followed.coordinates, { animate: false });
+    if (a && b) {
+      odRef.current = L.polyline(
+        [
+          [a.lat, a.lng],
+          [b.lat, b.lng],
+        ],
+        {
+          color: "#b91c1c",
+          weight: 3,
+          opacity: 0.85,
+          dashArray: "6 8",
         }
+      ).addTo(map);
+    }
+  }, [network, origin, destination, showOD]);
+
+  /*
+   * HAPUS CACHE JARINGAN DAN AMBIL ULANG.
+   *
+   * Reload diperlukan untuk mereset singleton
+   * getDenpasarNetwork pada modul browser.
+   */
+  async function refreshRoadNetwork() {
+    try {
+      setNotice("Memperbarui jaringan OSM...");
+
+      if (typeof caches !== "undefined") {
+        const cache = await caches.open(
+          "denpasar-network-v1"
+        );
+
+        const key = new URL(
+          "/denpasar-road-graph-v1.json",
+          window.location.origin
+        ).href;
+
+        await cache.delete(key);
       }
 
-      frameRef.current = requestAnimationFrame(animate);
-    };
+      window.location.reload();
+    } catch {
+      setNotice(
+        "Cache tidak dapat dihapus. Periksa pengaturan browser."
+      );
+    }
+  }
 
-    frameRef.current = requestAnimationFrame(animate);
+  function chooseBasemap(value) {
+    if (value === "satelit" && !MAPTILER_KEY) {
+      setNotice(
+        "Mode satelit memerlukan VITE_MAPTILER_KEY. " +
+        "Mode peta jalan OSM tetap bisa digunakan tanpa key."
+      );
+      return;
+    }
 
-    return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+    setNotice("");
+    setBasemap(value);
+  }
+
+  function showZones() {
+    setMode("zones");
+
+    if (!network?.zones?.length) return;
+
+    mapRef.current?.fitBounds(
+      network.zones.map((zone) => [
+        zone.lat,
+        zone.lng,
+      ]),
+      {
+        padding: [35, 35],
+        maxZoom: 12,
+        animate: false,
       }
-    };
-  }, [status, playing, mode]);
+    );
+  }
 
-  const reset = useCallback(() => {
-    elapsedRef.current = 0;
-    setMode("overview");
-    setTraffic(true);
+  function focusStreet() {
+    setMode("street");
+
+    mapRef.current?.setView(
+      [-8.670, 115.216],
+      16,
+      { animate: false }
+    );
+  }
+
+  function reset() {
+    setDensity(DEFAULT_DENSITY);
+    setScenario(initialScenario);
     setPlaying(true);
+    setShowHeat(false);
+    setShowOD(false);
+    setOrigin("Z11");
+    setDestination("Z03");
+    showZones();
+  }
 
-    vehicleMarkersRef.current.forEach(({ marker, vehicle }) => {
-      const point = vehiclePosition(vehicle, 0);
-      marker.setLatLng(point.coordinates);
-      const artwork = marker.getElement()?.querySelector(".denpasar-vehicle-art");
-      if (artwork) artwork.style.transform = `rotate(${point.bearing - 90}deg)`;
-    });
+  const zones = network?.zones || [];
 
-    mapRef.current?.flyTo(CENTER, 13, { duration: 0.7 });
-  }, []);
+  const oi = zones.findIndex(
+    (zone) => zone.id === origin
+  );
 
-  const retry = useCallback(() => window.location.reload(), []);
-  const zoomIn = useCallback(() => mapRef.current?.zoomIn(), []);
-  const zoomOut = useCallback(() => mapRef.current?.zoomOut(), []);
+  const di = zones.findIndex(
+    (zone) => zone.id === destination
+  );
+
+  const selectedOD =
+    oi >= 0 && di >= 0
+      ? network.mat[oi][di]
+      : null;
+
+  const reduction =
+    origin === "Z11" && destination === "Z03"
+      ? 0.3
+      : 0.12;
+
+  const shownOD =
+    selectedOD == null
+      ? null
+      : scenario === "after"
+        ? selectedOD * (1 - reduction)
+        : selectedOD;
+
+  const afterTotal = network?.mat.reduce(
+    (total, row, i) =>
+      total +
+      row.reduce(
+        (sum, value, j) =>
+          sum +
+          value *
+          (1 - (i === 10 && j === 2 ? 0.3 : 0.12)),
+        0
+      ),
+    0
+  );
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-3">
-      <div className="relative h-[420px] overflow-hidden rounded-[22px] bg-[#E8ECE6] sm:h-[520px] lg:h-[650px]">
+    <div className="mx-auto w-full max-w-[1450px] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:p-3">
+
+      <style>{`
+        .dm-map {
+          height: 100%;
+          width: 100%;
+          background: #edf1f4;
+        }
+
+        .dm-map.map-contrast .leaflet-tile-pane img {
+          filter:
+            grayscale(0.85)
+            brightness(1.1)
+            contrast(0.92);
+        }
+
+        .dm-zone-icon {
+          border: none !important;
+          background: transparent !important;
+        }
+
+        .dm-zone-icon span {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 32px;
+          height: 32px;
+          border: 2px solid #94a3b8;
+          border-radius: 50%;
+          background: white;
+          color: #334155;
+          font-size: 9px;
+          font-weight: 900;
+          box-shadow: 0 2px 8px #0003;
+        }
+
+        .dm-zone-icon span.active {
+          background: #b91c1c;
+          color: white;
+          border-color: white;
+        }
+
+        .dm-map .leaflet-control-attribution {
+          font-size: 9px;
+        }
+      `}</style>
+
+      {/* PETA */}
+
+      <div className="relative h-[440px] overflow-hidden rounded-xl bg-slate-100 sm:h-[570px] lg:h-[660px]">
+
         <div
-          ref={containerRef}
-          className="denpasar-leaflet-map absolute inset-0 z-0 h-full w-full"
-          aria-label="Peta interaktif demonstrasi Denpasar"
+          ref={mapDiv}
+          className={`dm-map absolute inset-0 z-0 ${
+            basemap === "kontras" ? "map-contrast" : ""
+          }`}
+          aria-label="Peta jaringan jalan Denpasar"
         />
 
-        {status === "loading" && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-slate-50/70">
-            <div className="rounded-xl bg-white px-5 py-3 text-sm font-medium text-slate-600 shadow">
-              Memuat peta Denpasar...
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-0 z-[450]"
+          aria-hidden="true"
+        />
+
+        {/* TOOLBAR UTAMA */}
+
+        <div className="absolute left-2 right-2 top-2 z-[1000] flex items-center gap-1 rounded-xl bg-slate-900/95 p-1.5 text-white shadow-lg sm:left-4 sm:right-auto sm:top-4 sm:gap-2">
+
+          <button
+            onClick={showZones}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold sm:flex-none sm:px-3 sm:text-xs ${
+              mode === "zones" ? "bg-red-700" : "bg-slate-700"
+            }`}
+          >
+            <MapIcon size={14} />
+            13 Zona
+          </button>
+
+          <button
+            onClick={focusStreet}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold sm:flex-none sm:px-3 sm:text-xs ${
+              mode === "street" ? "bg-red-700" : "bg-slate-700"
+            }`}
+          >
+            <CarFront size={14} />
+            Fokus Jalan
+          </button>
+
+          <button
+            onClick={() => setPlaying((v) => !v)}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-700"
+            aria-label={playing ? "Jeda" : "Jalankan"}
+          >
+            {playing
+              ? <Pause size={16} />
+              : <Play size={16} />}
+          </button>
+
+          <button
+            onClick={reset}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-700"
+            aria-label="Reset"
+          >
+            <RotateCcw size={16} />
+          </button>
+        </div>
+
+        {/* PILIHAN BASEMAP */}
+
+        <div className="absolute left-2 right-14 top-[60px] z-[1000] flex max-w-max flex-wrap gap-1 rounded-xl bg-white/95 p-1.5 shadow-lg sm:left-4 sm:top-[66px]">
+
+          <button
+            onClick={() => chooseBasemap("jalan")}
+            className={`rounded-lg px-3 py-2 text-[11px] font-bold ${
+              basemap === "jalan"
+                ? "bg-red-700 text-white"
+                : "text-slate-600"
+            }`}
+          >
+            <Layers size={13} className="mr-1 inline" />
+            Jalan
+          </button>
+
+          <button
+            onClick={() => chooseBasemap("kontras")}
+            className={`rounded-lg px-3 py-2 text-[11px] font-bold ${
+              basemap === "kontras"
+                ? "bg-red-700 text-white"
+                : "text-slate-600"
+            }`}
+          >
+            Kontras
+          </button>
+
+          <button
+            onClick={() => chooseBasemap("satelit")}
+            className={`rounded-lg px-3 py-2 text-[11px] font-bold ${
+              basemap === "satelit"
+                ? "bg-red-700 text-white"
+                : "text-slate-600"
+            }`}
+          >
+            <Satellite size={13} className="mr-1 inline" />
+            Satelit
+          </button>
+        </div>
+
+        {/* ZOOM */}
+
+        <div className="absolute right-2 top-[60px] z-[1000] flex flex-col gap-1.5 sm:right-4 sm:top-4">
+
+          <button
+            onClick={() => mapRef.current?.zoomIn(0.5)}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-md"
+            aria-label="Zoom In"
+          >
+            <Plus size={18} />
+          </button>
+
+          <button
+            onClick={() => mapRef.current?.zoomOut(0.5)}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-white shadow-md"
+            aria-label="Zoom Out"
+          >
+            <Minus size={18} />
+          </button>
+        </div>
+
+        {/* LOADING */}
+
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 z-[1100] grid place-items-center bg-slate-100/75 px-4">
+            <div className="rounded-xl bg-white px-5 py-4 text-center text-sm font-semibold shadow">
+              Memuat jaringan jalan Denpasar...
             </div>
           </div>
         )}
 
-        {status === "error" && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50/90 p-5">
-            <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-xl">
-              <div className="mb-3 flex items-center gap-3">
-                <AlertTriangle size={23} className="text-red-600" />
-                <h3 className="font-bold text-slate-900">Peta belum berhasil dimuat</h3>
-              </div>
-              <p className="break-words text-sm leading-6 text-slate-600">
-                {error || "Periksa koneksi internet dan akses tile OpenStreetMap."}
-              </p>
+        {/* ERROR */}
+
+        {(error || notice) && (
+          <div className="absolute bottom-20 left-2 right-2 z-[1100] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-900 shadow sm:left-4 sm:right-auto sm:max-w-md">
+            <Info size={14} className="mr-1 inline" />
+            {error || notice}
+          </div>
+        )}
+
+        {/* INFO PETA */}
+
+        <div className="pointer-events-none absolute bottom-2 left-2 z-[900] rounded-lg bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-800 shadow sm:bottom-4 sm:left-4">
+          {fmt(visibleCount)} kendaraan terlihat
+        </div>
+
+      </div>
+
+      {/* PANEL INFORMASI */}
+
+      <div className="grid gap-5 p-3 sm:p-5 lg:grid-cols-3">
+
+        <section className="min-w-0 space-y-3">
+
+          <h3 className="flex items-center gap-2 text-sm font-bold">
+            <SlidersHorizontal size={17} />
+            Pengaturan Lalu Lintas
+          </h3>
+
+          {showScenarioControls && (
+            <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={retry}
-                className="mt-5 rounded-full bg-[#B91C1C] px-5 py-3 text-xs font-semibold text-white transition hover:bg-red-800"
+                onClick={() => setScenario("before")}
+                className={`rounded-lg px-3 py-2 text-xs font-bold ${
+                  scenario === "before"
+                    ? "bg-red-700 text-white"
+                    : "bg-slate-100"
+                }`}
               >
-                Coba Muat Ulang
+                Before TDM
+              </button>
+
+              <button
+                onClick={() => setScenario("after")}
+                className={`rounded-lg px-3 py-2 text-xs font-bold ${
+                  scenario === "after"
+                    ? "bg-emerald-700 text-white"
+                    : "bg-slate-100"
+                }`}
+              >
+                After TDM
               </button>
             </div>
+          )}
+
+          <label className="block text-xs font-semibold text-slate-700">
+            Kepadatan visual: {density.toFixed(2)}×
+
+            <input
+              type="range"
+              min="0.4"
+              max="1.6"
+              step="0.05"
+              value={density}
+              onChange={(e) =>
+                setDensity(Number(e.target.value))
+              }
+              className="mt-2 block w-full accent-red-700"
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-4 text-xs">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showHeat}
+                onChange={(e) =>
+                  setShowHeat(e.target.checked)
+                }
+              />
+              Heat Jalan
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showOD}
+                onChange={(e) =>
+                  setShowOD(e.target.checked)
+                }
+              />
+              Garis OD
+            </label>
           </div>
-        )}
 
-        {status === "ready" && error && (
-          <div className="absolute bottom-28 left-4 right-4 z-20 mx-auto max-w-lg rounded-xl border border-amber-200 bg-white/95 px-4 py-3 text-xs text-slate-700 shadow">
-            {error}
-          </div>
-        )}
+        </section>
 
-        <div className="absolute left-3 right-3 top-3 z-20 flex flex-wrap items-center gap-1.5 rounded-2xl bg-[#252B2F]/95 p-2 shadow-lg backdrop-blur-md sm:left-5 sm:right-auto sm:top-5">
-          <span className="hidden px-3 text-[11px] font-black tracking-wider text-white lg:block">
-            DENPASAR MOBILITY LAB
-          </span>
-          <button onClick={() => setMode("2d")} aria-pressed={mode === "2d"} className={buttonClass(mode === "2d")}>
-            <MapIcon size={15} /> 2D
-          </button>
-          <button onClick={() => setMode("overview")} aria-pressed={mode === "overview"} className={buttonClass(mode === "overview")}>
-            <Layers3 size={15} /> Area View
-          </button>
-          <button onClick={() => setMode("pov")} aria-pressed={mode === "pov"} className={buttonClass(mode === "pov")}>
-            <Navigation size={15} /> POV Mobil
-          </button>
-          <button onClick={() => setTraffic((value) => !value)} aria-pressed={traffic} className={buttonClass(traffic)}>
-            <Route size={15} /> <span className="hidden sm:inline">Traffic</span>
-          </button>
-          <button onClick={() => setPlaying((value) => !value)} aria-label={playing ? "Jeda animasi" : "Jalankan animasi"} className={buttonClass(false)}>
-            {playing ? <Pause size={15} /> : <Play size={15} />}
-          </button>
-          <button onClick={zoomIn} aria-label="Perbesar peta" className={buttonClass(false)}>
-            <Plus size={15} />
-          </button>
-          <button onClick={zoomOut} aria-label="Perkecil peta" className={buttonClass(false)}>
-            <Minus size={15} />
-          </button>
-          <button onClick={reset} aria-label="Reset peta" className={buttonClass(false)}>
-            <RotateCcw size={15} />
-          </button>
-        </div>
+        <section className="min-w-0 space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-bold">
+            <Network size={17} />
+            Matriks Asal Tujuan
+          </h3>
 
-        <div className="absolute right-4 top-[76px] z-10 hidden rounded-full border border-white/80 bg-white/95 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm sm:right-5 sm:top-[76px] xl:block">
-          <span className={`mr-2 inline-block h-2 w-2 rounded-full ${status === "ready" ? "bg-green-500" : "bg-amber-500"}`} />
-          Denpasar — {mode === "pov" ? "POV Mobil" : mode === "2d" ? "2D Map" : "Area View"}
-        </div>
+          <label className="block text-xs">
+            Zona Asal
+            <select
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs"
+            >
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.id} — {zone.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <div className="pointer-events-none absolute bottom-4 left-4 right-4 z-10 rounded-2xl border border-white/70 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:bottom-5 sm:left-5 sm:right-5 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-slate-900">Denpasar Mobility Preview</p>
-              <p className="mt-2 max-w-2xl text-xs leading-6 text-slate-500">
-                Peta OpenStreetMap dengan animasi mobil, motor, bus, feeder, dan titik referensi.
-                Jalur serta gerak kendaraan masih berupa demonstrasi dan belum mengikuti
-                geometri jalan atau hasil SUMO. POV mengikuti kendaraan dari tampilan peta
-                atas, bukan kamera 3D.
-              </p>
-            </div>
-            <span className="rounded-full bg-red-50 px-3 py-1.5 text-[10px] font-semibold text-[#B91C1C]">
-              MAP PREVIEW
+          <label className="block text-xs">
+            Zona Tujuan
+            <select
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-xs"
+            >
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.id} — {zone.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+
+        <section className="min-w-0 rounded-2xl bg-slate-50 p-4 sm:p-5">
+
+          <p className="text-xs font-bold text-slate-600">
+            {scenario === "after"
+              ? "MAT SETELAH TDM — ASUMSI"
+              : "TOTAL MAT 2026"}
+          </p>
+
+          <p className="mt-2 text-2xl font-black">
+            {network
+              ? fmt(
+                  scenario === "after"
+                    ? afterTotal
+                    : network.metadata.matTotal
+                )
+              : "—"}
+            <span className="ml-2 text-xs font-normal">
+              smp/jam
             </span>
+          </p>
+
+          <p className="mt-4 text-xs font-bold text-red-700">
+            OD {origin} → {destination}
+          </p>
+
+          <p className="mt-1 text-lg font-black">
+            {shownOD == null ? "—" : fmt(shownOD)}
+            <span className="ml-1 text-xs font-normal">
+              smp/jam
+            </span>
+          </p>
+
+          <div className="mt-5 border-t border-slate-200 pt-4">
+            <p className="text-xs font-bold text-slate-700">
+              Data Jaringan OpenStreetMap
+            </p>
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Snapshot dataset:
+              {" "}
+              {formatSnapshot(network?.metadata?.snapshot)}
+            </p>
+
+            <button
+              type="button"
+              onClick={refreshRoadNetwork}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50"
+            >
+              <RefreshCw size={14} />
+              Perbarui Data Jalan
+            </button>
           </div>
-        </div>
+
+        </section>
+
       </div>
     </div>
   );

@@ -10,6 +10,13 @@ import {
 
 import Reveal from "../components/ui/Reveal";
 
+/*
+ * DENPASAR 2041 — RESEARCH METHODOLOGY
+ *
+ * Halaman metodologi pemodelan transportasi.
+ * React + Vite + Tailwind CSS.
+ */
+
 const steps = [
   {
     number: "01",
@@ -88,49 +95,101 @@ const formulas = [
   },
 ];
 
+const dataIntegrity = [
+  {
+    name: "SOURCE INPUT",
+    description:
+      "MAT dan data yang diturunkan dari referensi studi kasus.",
+  },
+  {
+    name: "CALCULATED",
+    description:
+      "Nilai yang dihasilkan melalui rumus dan algoritma yang dapat ditelusuri.",
+  },
+  {
+    name: "ASSUMPTION",
+    description:
+      "Parameter yang digunakan untuk eksperimen, bukan observasi lapangan.",
+  },
+  {
+    name: "DATA REQUIRED",
+    description:
+      "Indikator yang belum dapat dihitung karena data pendukung belum tersedia.",
+  },
+];
+
 export default function Methodology() {
   return (
-    <div className="bg-white">
-      <section className="px-5 pb-16 pt-20 text-center sm:pt-28">
+    <div className="min-h-screen bg-white">
+
+      {/* ========================================
+          HEADER
+      ======================================== */}
+
+      <section className="px-4 pb-12 pt-16 text-center sm:px-8 sm:pb-16 sm:pt-28">
         <Reveal>
-          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
-            Scientific Framework
-          </p>
+          <div className="mx-auto max-w-3xl">
 
-          <h1 className="text-4xl font-black text-slate-900 sm:text-6xl">
-            Research
-            <br />
-            <span className="text-[#B91C1C]">Methodology.</span>
-          </h1>
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
+              Scientific Framework
+            </p>
 
-          <p className="mx-auto mt-6 max-w-2xl text-sm leading-8 text-slate-500 sm:text-base">
-            Pendekatan sistematis untuk menghubungkan
-            data transportasi, model jaringan,
-            kebijakan TDM, dan evaluasi kinerja.
-          </p>
+            <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">
+              Research
+              <br />
+              <span className="text-[#B91C1C]">
+                Methodology.
+              </span>
+            </h1>
+
+            <p className="mx-auto mt-6 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base sm:leading-8">
+              Pendekatan sistematis untuk menghubungkan
+              data transportasi, model jaringan,
+              kebijakan TDM, dan evaluasi kinerja.
+            </p>
+
+          </div>
         </Reveal>
       </section>
 
-      <section className="px-5 pb-24 sm:px-8">
+      {/* ========================================
+          MODELING WORKFLOW
+      ======================================== */}
+
+      <section className="px-4 pb-20 sm:px-8 sm:pb-24">
         <div className="mx-auto max-w-7xl">
+
           <Reveal>
-            <h2 className="mb-9 text-2xl font-bold text-slate-900 sm:text-3xl">
+            <h2 className="mb-8 text-2xl font-bold text-slate-900 sm:mb-9 sm:text-3xl">
               Modeling Workflow
             </h2>
           </Reveal>
 
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+
             {steps.map((step, i) => {
               const Icon = step.icon;
 
               return (
-                <Reveal key={step.number} delay={(i % 3) * 100}>
-                  <div className="feature-card h-full rounded-3xl border border-slate-200 p-7">
-                    <div className="mb-7 flex items-center justify-between">
-                      <Icon size={24} className="text-[#B91C1C]" />
-                      <span className="font-bold text-slate-300">
+                <Reveal
+                  key={step.number}
+                  delay={(i % 3) * 100}
+                >
+                  <div className="feature-card h-full rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:border-red-200 hover:shadow-lg sm:rounded-3xl sm:p-7">
+
+                    <div className="mb-6 flex items-center justify-between sm:mb-7">
+
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
+                        <Icon
+                          size={24}
+                          className="text-[#B91C1C]"
+                        />
+                      </div>
+
+                      <span className="text-lg font-black text-slate-300">
                         {step.number}
                       </span>
+
                     </div>
 
                     <h3 className="text-lg font-bold text-slate-900">
@@ -140,101 +199,144 @@ export default function Methodology() {
                     <p className="mt-4 text-sm leading-7 text-slate-500">
                       {step.description}
                     </p>
+
                   </div>
                 </Reveal>
               );
             })}
+
           </div>
+
         </div>
       </section>
 
-      <section className="border-y border-slate-100 bg-[#FAFAFA] px-5 py-24 sm:px-8">
+      {/* ========================================
+          MATHEMATICAL FOUNDATION
+      ======================================== */}
+
+      <section className="border-y border-slate-100 bg-[#FAFAFA] px-4 py-16 sm:px-8 sm:py-24">
+
         <div className="mx-auto max-w-5xl">
+
           <Reveal>
+
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B91C1C]">
               Mathematical Foundation
             </p>
 
-            <h2 className="mb-10 text-3xl font-bold text-slate-900 sm:text-4xl">
+            <h2 className="mb-8 text-3xl font-bold tracking-tight text-slate-900 sm:mb-10 sm:text-4xl">
               Modeling Equations.
             </h2>
+
           </Reveal>
 
           <div className="space-y-4">
+
             {formulas.map((formula, i) => (
-              <Reveal key={formula.name} delay={(i % 2) * 70}>
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
-                  <h3 className="text-lg font-bold text-slate-900">
+              <Reveal
+                key={formula.name}
+                delay={(i % 2) * 70}
+              >
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:rounded-3xl sm:p-8">
+
+                  <h3 className="text-base font-bold text-slate-900 sm:text-lg">
                     {formula.name}
                   </h3>
 
-                  <div className="my-5 overflow-x-auto rounded-2xl bg-red-50 p-5 text-center">
-                    <p className="whitespace-nowrap text-xl font-bold tracking-wide text-[#B91C1C] sm:text-2xl">
+                  <div className="my-5 overflow-x-auto rounded-xl bg-red-50 p-4 sm:rounded-2xl sm:p-5">
+
+                    <p className="min-w-max text-center text-lg font-bold tracking-wide text-[#B91C1C] sm:text-2xl">
                       {formula.equation}
                     </p>
+
                   </div>
 
                   <p className="text-sm leading-7 text-slate-500">
                     {formula.meaning}
                   </p>
+
                 </div>
+
               </Reveal>
             ))}
+
           </div>
+
         </div>
       </section>
 
-      <section className="px-5 py-24 sm:px-8">
+      {/* ========================================
+          DATA INTEGRITY
+      ======================================== */}
+
+      <section className="px-4 py-16 sm:px-8 sm:py-24">
+
         <div className="mx-auto max-w-5xl">
+
           <Reveal>
-            <h2 className="text-3xl font-bold text-slate-900">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               Data Integrity & Model Boundaries
             </h2>
           </Reveal>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {[
-              [
-                "SOURCE INPUT",
-                "MAT dan data yang diturunkan dari referensi studi kasus.",
-              ],
-              [
-                "CALCULATED",
-                "Nilai yang dihasilkan melalui rumus dan algoritma yang dapat ditelusuri.",
-              ],
-              [
-                "ASSUMPTION",
-                "Parameter yang digunakan untuk eksperimen, bukan observasi lapangan.",
-              ],
-              [
-                "DATA REQUIRED",
-                "Indikator yang belum dapat dihitung karena data pendukung belum tersedia.",
-              ],
-            ].map(([name, description]) => (
+
+            {dataIntegrity.map((item) => (
               <div
-                key={name}
-                className="rounded-2xl border border-slate-200 p-6"
+                key={item.name}
+                className="rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-red-200 sm:p-6"
               >
+
                 <p className="mb-3 text-xs font-bold tracking-widest text-[#B91C1C]">
-                  {name}
+                  {item.name}
                 </p>
 
                 <p className="text-sm leading-7 text-slate-600">
-                  {description}
+                  {item.description}
                 </p>
+
               </div>
             ))}
+
           </div>
 
-          <p className="mt-8 text-sm leading-8 text-slate-500">
-            Pada implementasi model, MAT 2026 diproyeksikan
-            menuju 2041 dengan parameter yang dinyatakan
-            secara eksplisit. Kondisi Business as Usual 2041
-            dibandingkan terhadap kondisi Integrated TDM
-            2041 menggunakan basis jaringan yang sama.
-          </p>
+          <Reveal>
+            <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-7">
+
+              <div className="flex items-start gap-3">
+
+                <ShieldCheck
+                  size={22}
+                  className="mt-1 shrink-0 text-[#B91C1C]"
+                />
+
+                <div>
+
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Model Comparison Framework
+                  </h3>
+
+                  <p className="mt-3 text-sm leading-7 text-slate-500">
+                    Pada implementasi model, MAT 2026
+                    diproyeksikan menuju 2041 dengan
+                    parameter yang dinyatakan secara
+                    eksplisit. Kondisi Business as Usual
+                    2041 dibandingkan terhadap kondisi
+                    Integrated TDM 2041 menggunakan
+                    basis jaringan yang sama.
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+          </Reveal>
+
         </div>
       </section>
+
     </div>
   );
 }
