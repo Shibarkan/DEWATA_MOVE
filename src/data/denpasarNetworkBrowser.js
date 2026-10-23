@@ -1,35 +1,45 @@
 
 /**
- * DENPASAR 2041 — Browser Network Builder
+ * DEWATAMOVE 2041
+ * OFFLINE ILLUSTRATIVE ROAD NETWORK
  *
- * Tanpa script Node.js tambahan.
- * Data OSM diambil saat website pertama dibuka.
- * Hasil disimpan di CacheStorage browser.
+ * Tidak menggunakan Overpass API.
+ * Tidak menggunakan fetch().
+ * Tidak memerlukan JSON tambahan.
  *
- * MAT: ToR ITEC-U, 2026, satuan smp/jam.
- * Model: shortest-path assignment ilustratif.
+ * MAT 2026 berasal dari data ToR panitia.
+ * Jaringan jalan dan bobot arus bersifat ilustratif,
+ * bukan geometri OSM atau traffic assignment tervalidasi.
  */
 
-const CACHE_NAME = "denpasar-network-v1";
-const CACHE_KEY = "denpasar-road-graph-v1";
-
-const BBOX = [-8.765, 115.155, -8.588, 115.291];
+// ===========================================
+// 13 ZONA DENPASAR
+// ===========================================
 
 const ZONES = [
-  ["Z01", "Dangin Puri & Sumerta", -8.6535, 115.235],
-  ["Z02", "Dauh Puri & Pemecutan", -8.6598, 115.203],
-  ["Z03", "Ubung & Peguyangan", -8.6250, 115.210],
-  ["Z04", "Tonja", -8.6400, 115.226],
-  ["Z05", "Kesiman", -8.6550, 115.257],
-  ["Z06", "Sanur", -8.6940, 115.264],
-  ["Z07", "Renon / Panjer / Sesetan / Pedungan / Pemogan", -8.6920, 115.219],
-  ["Z08", "Padangsambian", -8.6690, 115.182],
-  ["Z09", "Padangsambian Kaja & Ubung Kaja", -8.6340, 115.187],
-  ["Z10", "Peguyangan Kaja & Kangin", -8.6060, 115.229],
-  ["Z11", "Penatih", -8.6240, 115.251],
-  ["Z12", "Serangan & Pelabuhan Benoa", -8.7420, 115.244],
-  ["Z13", "Bandara / Tuban / Kuta", -8.7420, 115.181],
-];
+  ["Z01", "Dangin Puri dan Sumerta", -8.6535, 115.235],
+  ["Z02", "Dauh Puri dan Pemecutan", -8.6598, 115.203],
+  ["Z03", "Ubung dan Peguyangan", -8.625, 115.21],
+  ["Z04", "Tonja", -8.64, 115.226],
+  ["Z05", "Kesiman", -8.655, 115.257],
+  ["Z06", "Sanur Kaja dan Sanur Kauh", -8.694, 115.264],
+  ["Z07", "Renon, Panjer, Sesetan, Pedungan, Pemogan", -8.692, 115.219],
+  ["Z08", "Padangsambian", -8.669, 115.182],
+  ["Z09", "Padangsambian Kaja dan Ubung Kaja", -8.634, 115.187],
+  ["Z10", "Peguyangan Kaja dan Peguyangan Kangin", -8.606, 115.229],
+  ["Z11", "Penatih dan Penatih Dangin Puri", -8.624, 115.251],
+  ["Z12", "Pulau Serangan dan Pelabuhan Benoa", -8.742, 115.244],
+  ["Z13", "Bandara Ngurah Rai, Tuban, Kuta", -8.742, 115.181],
+].map(([id, name, lat, lng]) => ({
+  id,
+  name,
+  lat,
+  lng,
+}));
+
+// ===========================================
+// MAT 2026 — SMP/JAM
+// ===========================================
 
 const MAT = [
   [1014,3349,5676,146,434,573,495,188,1236,396,149,90,414],
@@ -47,561 +57,351 @@ const MAT = [
   [2180,11662,14661,327,933,1514,2015,780,3868,980,320,483,3254],
 ];
 
-const ROAD_TYPES = [
-  "motorway", "trunk", "primary", "secondary",
-  "tertiary", "unclassified", "residential",
-  "living_street", "service",
+const MAT_TOTAL = MAT
+  .flat()
+  .reduce((total, value) => total + value, 0);
+
+// ===========================================
+// GEOMETRY HELPERS
+// ===========================================
+
+const toKm = ([lat, lng]) => [
+  lat * 111.2,
+  lng * 110.2,
 ];
 
-const SPEEDS = [65, 55, 40, 34, 29, 23, 22, 15, 12];
-
-function roadType(value) {
-  const name = String(value || "").replace(/_link$/, "");
-  const index = ROAD_TYPES.indexOf(name);
-  return index < 0 ? 6 : index;
-}
-
-function distance(a, b) {
-  const lat = (a[0] + b[0]) * Math.PI / 360;
-
+function distanceMeters(a, b) {
   return Math.hypot(
-    (a[0] - b[0]) * 111320,
-    (a[1] - b[1]) * 111320 * Math.cos(lat)
+    (a[0] - b[0]) * 111200,
+    (a[1] - b[1]) * 110200
   );
 }
 
-function isBlocked(tags) {
-  const denied = new Set([
-    "no", "private", "agricultural", "forestry",
-  ]);
+function distanceToLine(point, from, to) {
+  const vx = to[0] - from[0];
+  const vy = to[1] - from[1];
 
-  return (
-    denied.has(tags.access) ||
-    denied.has(tags.motor_vehicle) ||
-    denied.has(tags.motorcar) ||
-    denied.has(tags.vehicle) ||
-    tags.area === "yes" ||
-    tags.service === "parking_aisle"
-  );
-}
+  const magnitude = vx * vx + vy * vy || 1;
 
-// Mengambil data jalan OSM di browser.
-// Menggunakan dua endpoint sebagai cadangan.
-async function fetchRoads() {
-  const roadPattern = [
-    "motorway", "motorway_link",
-    "trunk", "trunk_link",
-    "primary", "primary_link",
-    "secondary", "secondary_link",
-    "tertiary", "tertiary_link",
-    "unclassified", "residential",
-    "living_street", "service",
-  ].join("|");
-
-  const query = `
-    [out:json][timeout:120];
-    way["highway"~"^(${roadPattern})$"]
-    (${BBOX.join(",")});
-    out geom;
-  `;
-
-  const endpoints = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-  ];
-
-  let lastError;
-
-  for (const endpoint of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(
-        () => controller.abort(),
-        130000
-      );
-
-      try {
-        const url =
-          `${endpoint}?data=${encodeURIComponent(query)}`;
-
-        const response = await fetch(url, {
-          method: "GET",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Overpass HTTP ${response.status}`);
-        }
-
-        const json = await response.json();
-
-        if (!Array.isArray(json.elements) ||
-            json.elements.length === 0) {
-          throw new Error("Data jalan kosong");
-        }
-
-        return json;
-      } finally {
-        clearTimeout(timer);
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn("Server OSM gagal:", error.message);
-    }
-  }
-
-  throw new Error(
-    "Gagal mengakses jaringan jalan OSM. " +
-    (lastError?.message || "Periksa koneksi internet.")
-  );
-}
-
-// Mengubah jalan OSM menjadi graf berarah.
-function makeGraph(osm) {
-  const nodeIds = new Map();
-  const nodes = [];
-  const edges = [];
-
-  function nodeIndex(id, geometry) {
-    if (nodeIds.has(id)) return nodeIds.get(id);
-
-    const index = nodes.length;
-
-    nodes.push([geometry.lat, geometry.lon]);
-    nodeIds.set(id, index);
-
-    return index;
-  }
-
-  for (const way of osm.elements) {
-    if (
-      way.type !== "way" ||
-      !Array.isArray(way.nodes) ||
-      !Array.isArray(way.geometry)
-    ) continue;
-
-    const tags = way.tags || {};
-
-    if (isBlocked(tags)) continue;
-
-    const type = roadType(tags.highway);
-    const oneway = String(tags.oneway || "").toLowerCase();
-
-    const reverseOnly = oneway === "-1";
-
-    const forwardOnly =
-      reverseOnly ||
-      ["yes", "true", "1"].includes(oneway) ||
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
       (
-        oneway !== "no" &&
-        (
-          tags.junction === "roundabout" ||
-          ["motorway", "motorway_link"].includes(tags.highway)
-        )
-      );
-
-    for (let i = 1; i < way.nodes.length; i++) {
-      if (!way.geometry[i] || !way.geometry[i - 1]) {
-        continue;
-      }
-
-      const a = nodeIndex(
-        way.nodes[i - 1],
-        way.geometry[i - 1]
-      );
-
-      const b = nodeIndex(
-        way.nodes[i],
-        way.geometry[i]
-      );
-
-      const len = distance(nodes[a], nodes[b]);
-
-      if (a === b || len < 0.4 || len > 4000) {
-        continue;
-      }
-
-      if (!reverseOnly) {
-        edges.push({
-          a, b, len, type,
-          before: 0, after: 0,
-        });
-      }
-
-      if (!forwardOnly || reverseOnly) {
-        edges.push({
-          a: b, b: a, len, type,
-          before: 0, after: 0,
-        });
-      }
-    }
-  }
-
-  if (!nodes.length || !edges.length) {
-    throw new Error("Tidak ada jalan yang bisa diproses");
-  }
-
-  const adjacency = Array.from(
-    { length: nodes.length },
-    () => []
-  );
-
-  edges.forEach((edge, i) => {
-    adjacency[edge.a].push(i);
-  });
-
-  return { nodes, edges, adjacency };
-}
-
-// Priority queue untuk perhitungan shortest path.
-class MinHeap {
-  constructor() {
-    this.items = [];
-  }
-
-  push(value) {
-    const heap = this.items;
-    let i = heap.length;
-
-    heap.push(value);
-
-    while (i > 0) {
-      const parent = (i - 1) >> 1;
-      if (heap[parent][0] <= value[0]) break;
-
-      heap[i] = heap[parent];
-      i = parent;
-    }
-
-    heap[i] = value;
-  }
-
-  pop() {
-    const heap = this.items;
-
-    if (!heap.length) return null;
-
-    const top = heap[0];
-    const last = heap.pop();
-
-    if (!heap.length) return top;
-
-    let i = 0;
-
-    while (2 * i + 1 < heap.length) {
-      let child = 2 * i + 1;
-
-      if (
-        child + 1 < heap.length &&
-        heap[child + 1][0] < heap[child][0]
-      ) {
-        child++;
-      }
-
-      if (heap[child][0] >= last[0]) break;
-
-      heap[i] = heap[child];
-      i = child;
-    }
-
-    heap[i] = last;
-    return top;
-  }
-
-  get size() {
-    return this.items.length;
-  }
-}
-
-function dijkstra(graph, start) {
-  const { nodes, edges, adjacency } = graph;
-
-  const dist = new Float64Array(nodes.length);
-  const previous = new Int32Array(nodes.length);
-
-  dist.fill(Infinity);
-  previous.fill(-1);
-
-  const queue = new MinHeap();
-
-  dist[start] = 0;
-  queue.push([0, start]);
-
-  while (queue.size) {
-    const item = queue.pop();
-    if (!item) break;
-
-    const [travelTime, current] = item;
-
-    if (travelTime > dist[current]) continue;
-
-    for (const index of adjacency[current]) {
-      const edge = edges[index];
-
-      const speed =
-        SPEEDS[edge.type] * 1000 / 3600;
-
-      const cost = edge.len / speed;
-      const nextTime = travelTime + cost;
-
-      if (nextTime < dist[edge.b]) {
-        dist[edge.b] = nextTime;
-        previous[edge.b] = index;
-
-        queue.push([nextTime, edge.b]);
-      }
-    }
-  }
-
-  return previous;
-}
-
-function nearestNode(graph, lat, lng) {
-  const point = [lat, lng];
-  let best = -1;
-  let bestDistance = Infinity;
-
-  for (let i = 0; i < graph.nodes.length; i++) {
-    if (!graph.adjacency[i].length) continue;
-
-    const d = distance(point, graph.nodes[i]);
-
-    if (d < bestDistance) {
-      bestDistance = d;
-      best = i;
-    }
-  }
-
-  return best;
-}
-
-function traceRoute(graph, previous, origin, target) {
-  const route = [];
-  let node = target;
-  let safety = 0;
-
-  while (
-    node !== origin &&
-    safety++ < graph.nodes.length
-  ) {
-    const edgeIndex = previous[node];
-
-    if (edgeIndex < 0) return null;
-
-    route.push(edgeIndex);
-    node = graph.edges[edgeIndex].a;
-  }
-
-  return node === origin ? route : null;
-}
-
-// Menempatkan bobot MAT pada jaringan jalan.
-function assignTraffic(graph) {
-  const offsets = [
-    [0.0035, 0.003],
-    [-0.0035, -0.003],
-  ];
-
-  const accessPoints = ZONES.map(zone =>
-    offsets.map(([dy, dx]) =>
-      nearestNode(
-        graph,
-        zone[2] + dy,
-        zone[3] + dx
-      )
+        (point[0] - from[0]) * vx +
+        (point[1] - from[1]) * vy
+      ) / magnitude
     )
   );
 
-  let successfulRoutes = 0;
-  let failedRoutes = 0;
+  return Math.hypot(
+    point[0] - from[0] - t * vx,
+    point[1] - from[1] - t * vy
+  );
+}
 
-  for (let origin = 0; origin < 13; origin++) {
-    for (let sample = 0; sample < 2; sample++) {
-      const start = accessPoints[origin][sample];
+// ===========================================
+// PRIORITAS PERJALANAN BERDASARKAN MAT
+// ===========================================
 
-      if (start < 0) continue;
+const PRIORITY_OD = [];
 
-      const previous = dijkstra(graph, start);
+for (let i = 0; i < 13; i++) {
+  for (let j = 0; j < 13; j++) {
+    if (i !== j && MAT[i][j] > 0) {
+      PRIORITY_OD.push({
+        a: toKm([
+          ZONES[i].lat,
+          ZONES[i].lng,
+        ]),
 
-      for (let destination = 0; destination < 13; destination++) {
-        const demand = MAT[origin][destination];
+        b: toKm([
+          ZONES[j].lat,
+          ZONES[j].lng,
+        ]),
 
-        if (demand <= 0) continue;
+        weight: MAT[i][j],
+      });
+    }
+  }
+}
 
-        // Parameter kebijakan masih ilustratif.
-        const reduction =
-          origin === 10 && destination === 2
-            ? 0.30
-            : 0.12;
+PRIORITY_OD.sort((a, b) => b.weight - a.weight);
 
-        const afterDemand = demand * (1 - reduction);
+const TOP_OD = PRIORITY_OD.slice(0, 24);
 
-        // Perjalanan intrazona memakai titik akses lain.
-        const samples =
-          origin === destination
-            ? [1 - sample]
-            : [0, 1];
+// ===========================================
+// VISUAL TRAFFIC PRESSURE
+// ===========================================
 
-        const divisor = 2 * samples.length;
+function illustrativeFlow(a, b, roadClass) {
+  const center = toKm([
+    (a[0] + b[0]) / 2,
+    (a[1] + b[1]) / 2,
+  ]);
 
-        for (const destSample of samples) {
-          const end =
-            accessPoints[destination][destSample];
+  let pressure = 0;
 
-          const path = traceRoute(
-            graph, previous, start, end
-          );
+  for (const od of TOP_OD) {
+    const distance = distanceToLine(
+      center,
+      od.a,
+      od.b
+    );
 
-          if (!path?.length) {
-            failedRoutes++;
-            continue;
-          }
+    pressure +=
+      Math.sqrt(od.weight / 192833) *
+      Math.exp(
+        -0.5 * (distance / 1.6) ** 2
+      );
+  }
 
-          successfulRoutes++;
+  const roadFactor =
+    roadClass <= 3
+      ? 1.9
+      : roadClass === 4
+        ? 1.3
+        : 0.65;
 
-          for (const edgeIndex of path) {
-            graph.edges[edgeIndex].before +=
-              demand / divisor;
+  return (
+    Math.round(
+      100 * roadFactor * (0.55 + pressure)
+    ) / 100
+  );
+}
 
-            graph.edges[edgeIndex].after +=
-              afterDemand / divisor;
-          }
-        }
+// ===========================================
+// APPROXIMATE LAND LIMIT
+// ===========================================
+
+function onLand(lat, lng) {
+  // Filter kasar agar sebagian jaringan
+  // tidak berada jauh di area perairan.
+  // BUKAN batas daratan GIS resmi.
+
+  if (
+    lat < -8.709 &&
+    lng > 115.257
+  ) {
+    return false;
+  }
+
+  if (
+    lat < -8.726 &&
+    lng > 115.204 &&
+    lng < 115.233
+  ) {
+    return false;
+  }
+
+  if (
+    lat < -8.733 &&
+    lng < 115.172
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+// ===========================================
+// BUILD ILLUSTRATIVE ROAD NETWORK
+// ===========================================
+
+function buildIllustrativeNetwork() {
+  const nodes = [];
+  const edges = [];
+
+  const idByCell = new Map();
+
+  const latSteps = 23;
+  const lngSteps = 24;
+
+  const cellId = (row, col) =>
+    `${row}:${col}`;
+
+  // Membuat titik-titik jaringan ilustratif.
+
+  for (let row = 0; row < latSteps; row++) {
+    const lat =
+      -8.745 +
+      row * (0.146 / (latSteps - 1));
+
+    for (let col = 0; col < lngSteps; col++) {
+      const lng =
+        115.162 +
+        col * (0.114 / (lngSteps - 1));
+
+      if (!onLand(lat, lng)) continue;
+
+      const curvedLat =
+        lat +
+        Math.sin(
+          row * 1.03 + col * 0.4
+        ) * 0.00024;
+
+      const curvedLng =
+        lng +
+        Math.sin(
+          col * 0.91 + row * 0.28
+        ) * 0.00024;
+
+      idByCell.set(
+        cellId(row, col),
+        nodes.length
+      );
+
+      nodes.push([
+        curvedLat,
+        curvedLng,
+      ]);
+    }
+  }
+
+  // Menghubungkan titik menjadi dua arah.
+
+  function connect(a, b, roadClass) {
+    const length =
+      Math.round(
+        distanceMeters(
+          nodes[a],
+          nodes[b]
+        ) * 10
+      ) / 10;
+
+    const flow = illustrativeFlow(
+      nodes[a],
+      nodes[b],
+      roadClass
+    );
+
+    // Contoh visual After TDM:
+    // angka 0.88 belum berasal dari
+    // model kebijakan TDM tervalidasi.
+
+    const after =
+      Math.round(
+        flow * 0.88 * 100
+      ) / 100;
+
+    edges.push([
+      a,
+      b,
+      length,
+      roadClass,
+      flow,
+      after,
+    ]);
+
+    edges.push([
+      b,
+      a,
+      length,
+      roadClass,
+      flow,
+      after,
+    ]);
+  }
+
+  for (let row = 0; row < latSteps; row++) {
+    for (let col = 0; col < lngSteps; col++) {
+      const from = idByCell.get(
+        cellId(row, col)
+      );
+
+      if (from === undefined) continue;
+
+      const roadClass =
+        row % 5 === 0 ||
+        col % 5 === 0
+          ? 3
+          : row % 3 === 0 ||
+              col % 3 === 0
+            ? 4
+            : 6;
+
+      const east = idByCell.get(
+        cellId(row, col + 1)
+      );
+
+      const north = idByCell.get(
+        cellId(row + 1, col)
+      );
+
+      if (east !== undefined) {
+        connect(
+          from,
+          east,
+          roadClass
+        );
+      }
+
+      if (north !== undefined) {
+        connect(
+          from,
+          north,
+          roadClass
+        );
       }
     }
   }
 
-  return { successfulRoutes, failedRoutes };
-}
+  // =========================================
+  // METADATA
+  // =========================================
 
-function calculateP95(graph) {
-  const values = graph.edges
-    .map(e => e.before)
-    .filter(value => value > 0)
+  const flows = edges
+    .map((edge) => edge[4])
     .sort((a, b) => a - b);
 
-  if (!values.length) return 1;
-
-  return Math.max(
-    1,
-    values[Math.floor((values.length - 1) * 0.95)]
+  const p95Index = Math.min(
+    flows.length - 1,
+    Math.floor(flows.length * 0.95)
   );
-}
 
-function makeNetwork(osm) {
-  const graph = makeGraph(osm);
-  const assignment = assignTraffic(graph);
+  const visualP95 =
+    flows[p95Index] || 1;
 
   return {
     format: 1,
-    attribution: "© OpenStreetMap contributors",
-    metadata: {
-      name: "Denpasar 2041 Traffic Preview",
-      matTotal: 1316578,
-      priorityOD: 192833,
-      visualP95: Math.round(calculateP95(graph)),
-      routedPaths: assignment.successfulRoutes,
-      unresolvedPaths: assignment.failedRoutes,
-      snapshot: osm.osm3s?.timestamp_osm_base ?? null,
-    },
-    zones: ZONES.map(z => ({
-      id: z[0],
-      name: z[1],
-      lat: z[2],
-      lng: z[3],
-    })),
+
+    nodes,
+
+    edges,
+
+    zones: ZONES,
+
     mat: MAT,
-    nodes: graph.nodes,
-    edges: graph.edges.map(e => [
-      e.a,
-      e.b,
-      Math.round(e.len * 10) / 10,
-      e.type,
-      Math.round(e.before),
-      Math.round(e.after),
-    ]),
+
+    metadata: {
+      matTotal: MAT_TOTAL,
+
+      visualP95,
+
+      source:
+        "Jaringan ilustratif internal — tanpa API",
+
+      trafficCalibration:
+        "Belum dikalibrasi dengan volume ruas",
+
+      afterNote:
+        "After TDM hanya contoh visual dengan faktor 0.88",
+    },
   };
 }
 
-// Cache agar tidak selalu memanggil server OSM.
-async function readCache() {
-  if (typeof caches === "undefined") return null;
+// ===========================================
+// MAIN EXPORT
+// ===========================================
 
-  try {
-    const store = await caches.open(CACHE_NAME);
-    const response = await store.match(
-      new URL(`/${CACHE_KEY}.json`, location.origin).href
+let cachedPromise;
+
+export function getDenpasarNetwork() {
+  if (!cachedPromise) {
+    cachedPromise = Promise.resolve().then(
+      buildIllustrativeNetwork
     );
-
-    if (!response) return null;
-
-    const graph = await response.json();
-
-    return graph?.format === 1 ? graph : null;
-  } catch {
-    return null;
   }
-}
 
-async function writeCache(graph) {
-  if (typeof caches === "undefined") return;
-
-  try {
-    const store = await caches.open(CACHE_NAME);
-    const key = new URL(
-      `/${CACHE_KEY}.json`,
-      location.origin
-    ).href;
-
-    await store.put(
-      key,
-      new Response(JSON.stringify(graph), {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-    );
-  } catch (error) {
-    console.warn("Cache tidak tersimpan:", error);
-  }
-}
-
-let currentLoad = null;
-
-export async function getDenpasarNetwork() {
-  if (currentLoad) return currentLoad;
-
-  currentLoad = (async () => {
-    const cached = await readCache();
-
-    if (cached) {
-      console.info("Jaringan Denpasar dari cache browser");
-      return cached;
-    }
-
-    console.info("Mengambil jaringan OSM Denpasar...");
-
-    const osm = await fetchRoads();
-
-    // Beri kesempatan browser menggambar status loading.
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    const graph = makeNetwork(osm);
-
-    await writeCache(graph);
-
-    console.info("Jaringan Denpasar siap:", {
-      nodes: graph.nodes.length,
-      edges: graph.edges.length,
-      routes: graph.metadata.routedPaths,
-      failed: graph.metadata.unresolvedPaths,
-    });
-
-    return graph;
-  })().catch(error => {
-    currentLoad = null;
-    throw error;
-  });
-
-  return currentLoad;
+  return cachedPromise;
 }
