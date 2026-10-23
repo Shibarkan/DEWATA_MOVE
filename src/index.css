@@ -1,395 +1,619 @@
-
 @import "tailwindcss";
 
 /* ==========================================
+
    DENPASAR 2041 — GLOBAL DESIGN SYSTEM
+
 ========================================== */
 
 :root {
+
   font-family:
+
     Inter,
+
     ui-sans-serif,
+
     system-ui,
+
     -apple-system,
+
     BlinkMacSystemFont,
+
     "Segoe UI",
+
     sans-serif;
 
   font-synthesis: none;
+
   text-rendering: optimizeLegibility;
+
   -webkit-font-smoothing: antialiased;
+
   -moz-osx-font-smoothing: grayscale;
 
   color-scheme: light;
 
   --primary: #b91c1c;
+
   --primary-hover: #991b1b;
+
   --primary-light: #fef2f2;
 
   --background: #ffffff;
+
   --surface: #fafafa;
+
   --surface-secondary: #f8fafc;
 
   --text-primary: #17202d;
+
   --text-secondary: #64748b;
+
   --border: #e2e8f0;
 
   --radius-card: 20px;
+
   --radius-panel: 24px;
 
   --transition-smooth:
+
     cubic-bezier(0.22, 1, 0.36, 1);
 
   background: var(--background);
+
   color: var(--text-primary);
+
 }
 
 /* ==========================================
+
    GLOBAL RESET
+
 ========================================== */
 
 *,
+
 *::before,
+
 *::after {
+
   box-sizing: border-box;
+
 }
 
 html {
+
   scroll-behavior: smooth;
+
   scroll-padding-top: 110px;
+
   -webkit-text-size-adjust: 100%;
+
 }
 
 body {
+
   margin: 0;
+
   min-width: 320px;
+
   min-height: 100vh;
+
   overflow-x: hidden;
 
   background: var(--background);
+
   color: var(--text-primary);
+
 }
 
 #root {
+
   width: 100%;
+
   min-height: 100vh;
+
 }
 
 button {
+
   cursor: pointer;
+
   font: inherit;
+
 }
 
 button,
+
 a {
+
   -webkit-tap-highlight-color: transparent;
+
 }
 
 button:focus-visible,
+
 a:focus-visible,
+
 input:focus-visible,
+
 select:focus-visible,
+
 textarea:focus-visible {
+
   outline: 2px solid var(--primary);
+
   outline-offset: 3px;
+
 }
 
 button:disabled {
+
   cursor: not-allowed;
+
   opacity: 0.55;
+
 }
 
 ::selection {
+
   background: #fecaca;
+
   color: #7f1d1d;
+
 }
 
 img {
+
   max-width: 100%;
+
 }
 
 svg {
+
   flex-shrink: 0;
+
 }
 
 a {
+
   color: inherit;
+
 }
 
 /* ==========================================
+
    HERO ANIMATION
+
 ========================================== */
 
 @keyframes heroEnter {
+
   from {
+
     opacity: 0;
+
     transform: translateY(30px);
+
     filter: blur(5px);
+
   }
 
   to {
+
     opacity: 1;
+
     transform: translateY(0);
+
     filter: blur(0);
+
   }
+
 }
 
 .hero-enter {
+
   animation:
+
     heroEnter 0.8s
+
     cubic-bezier(0.22, 1, 0.36, 1)
+
     both;
+
 }
 
 .hero-delay-1 {
+
   animation-delay: 100ms;
+
 }
 
 .hero-delay-2 {
+
   animation-delay: 220ms;
+
 }
 
 .hero-delay-3 {
+
   animation-delay: 340ms;
+
 }
 
 .hero-delay-4 {
+
   animation-delay: 460ms;
+
 }
 
 /* ==========================================
+
    SCROLL REVEAL
+
 ========================================== */
 
 .reveal-item {
+
   opacity: 0;
+
   transform: translateY(24px);
 
   transition:
+
     opacity 0.65s
+
       cubic-bezier(0.22, 1, 0.36, 1),
+
     transform 0.65s
+
       cubic-bezier(0.22, 1, 0.36, 1);
+
 }
 
 .reveal-item.reveal-visible {
+
   opacity: 1;
+
   transform: translateY(0);
+
 }
 
 /* Optional staggered reveal */
 
 .reveal-delay-1 {
+
   transition-delay: 80ms;
+
 }
 
 .reveal-delay-2 {
+
   transition-delay: 160ms;
+
 }
 
 .reveal-delay-3 {
+
   transition-delay: 240ms;
+
 }
 
 .reveal-delay-4 {
+
   transition-delay: 320ms;
+
 }
 
 /* ==========================================
+
    FLOATING HERO BACKGROUND
+
 ========================================== */
 
 @keyframes orbFloat {
+
   0%,
+
   100% {
+
     transform: translate(0, 0);
+
   }
 
   50% {
+
     transform: translate(24px, -22px);
+
   }
+
 }
 
 .hero-orb {
+
   animation: orbFloat 12s ease-in-out infinite;
+
   will-change: transform;
+
 }
 
 .hero-orb-delay {
+
   animation-delay: -6s;
+
 }
 
 /* ==========================================
+
    OPTIONAL SCROLL INDICATOR
+
 ========================================== */
 
 @keyframes arrowBounce {
+
   0%,
+
   100% {
+
     transform: translateY(0);
+
   }
 
   50% {
+
     transform: translateY(7px);
+
   }
+
 }
 
 .scroll-arrow {
+
   animation: arrowBounce 1.8s ease-in-out infinite;
+
 }
 
 /* ==========================================
+
    FEATURE CARDS
+
 ========================================== */
 
 .feature-card {
+
   transition:
+
     transform 0.4s var(--transition-smooth),
+
     box-shadow 0.4s ease,
+
     border-color 0.4s ease,
+
     background-color 0.3s ease;
+
 }
 
 @media (hover: hover) {
+
   .feature-card:hover {
+
     transform: translateY(-6px);
+
     border-color: #fecaca;
 
     box-shadow:
+
       0 22px 45px rgba(15, 23, 42, 0.08);
+
   }
+
 }
 
 /* ==========================================
+
    NETWORK GRID
+
 ========================================== */
 
 .preview-grid {
+
   position: absolute;
+
   inset: 0;
 
   background-image:
+
     linear-gradient(
+
       rgba(148, 163, 184, 0.13) 1px,
+
       transparent 1px
+
     ),
+
     linear-gradient(
+
       90deg,
+
       rgba(148, 163, 184, 0.13) 1px,
+
       transparent 1px
+
     );
 
   background-size: 32px 32px;
+
   pointer-events: none;
+
 }
 
 /* ==========================================
+
    SVG NETWORK PERSPECTIVE
+
 ========================================== */
 
 .network-stage {
+
   transform-origin: center center;
 
   transform:
+
     perspective(1100px)
+
     rotateX(0deg)
+
     rotateZ(0deg)
+
     scale(1);
 
   transition:
+
     transform 0.9s var(--transition-smooth);
+
 }
 
 .network-stage.network-tilt {
+
   transform:
+
     perspective(1100px)
+
     rotateX(20deg)
+
     rotateZ(-7deg)
+
     scale(1.2);
+
 }
 
 /* ==========================================
+
    ANIMATED ROUTES
+
 ========================================== */
 
 @keyframes routeFlow {
+
   to {
+
     stroke-dashoffset: -208;
+
   }
+
 }
 
 .route-flow {
+
   animation: routeFlow 5s linear infinite;
+
 }
 
 .route-flow-slow {
+
   animation-duration: 8s;
+
 }
 
 /* ==========================================
+
    NETWORK NODES
+
 ========================================== */
 
 @keyframes nodePulse {
+
   0%,
+
   100% {
+
     opacity: 0.12;
+
   }
 
   50% {
+
     opacity: 0.4;
+
   }
+
 }
 
 .node-pulse {
+
   transform-box: fill-box;
+
   transform-origin: center;
+
   animation: nodePulse 2.5s ease-in-out infinite;
+
 }
 
 /* ==========================================
+
    HEADER — TRANS METRO DEWATA BUS ORBIT
+
 ========================================== */
 
 .tmd-orbit {
+
   position: absolute;
+
   inset: 0;
+
   z-index: 0;
 
   overflow: hidden;
+
   border-radius: inherit;
+
   pointer-events: none;
+
 }
 
 /* Orbit track */
 
 .tmd-orbit-track {
+
   position: absolute;
+
   inset: 8px;
 
   border: 1px dashed rgba(255, 255, 255, 0.16);
+
   border-radius: 0;
 
   transition: border-radius 500ms ease;
+
 }
 
 /* Moving bus */
 
 .tmd-orbit-bus {
+
   position: absolute;
+
   top: 0;
+
   left: 0;
 
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   width: 46px;
+
   height: 23px;
 
   offset-path: inset(9px round 0px);
+
   offset-distance: 0%;
+
   offset-anchor: center;
+
   offset-rotate: auto;
 
   animation: tmdDrive 28s linear infinite;
@@ -397,67 +621,97 @@ a {
   transition: offset-path 500ms ease;
 
   filter:
+
     drop-shadow(0 2px 4px rgba(0, 0, 0, 0.24));
 
   will-change: offset-distance;
+
 }
 
 .tmd-orbit-bus-second {
+
   animation-delay: -14s;
+
 }
 
 /* Header becomes rounded after scrolling */
 
 .tmd-header[data-scrolled="true"] .tmd-orbit-track {
+
   border-radius: 999px;
+
 }
 
 .tmd-header[data-scrolled="true"] .tmd-orbit-bus {
+
   offset-path: inset(9px round 999px);
+
 }
 
 @keyframes tmdDrive {
+
   from {
+
     offset-distance: 0%;
+
   }
 
   to {
+
     offset-distance: 100%;
+
   }
+
 }
 
 /* ==========================================
+
    FOOTER — MOVING BUS
+
 ========================================== */
 
 @keyframes footerBusDrive {
+
   from {
+
     left: 0%;
+
     transform: translate(-100%, -50%);
+
   }
 
   to {
+
     left: 100%;
+
     transform: translate(0%, -50%);
+
   }
+
 }
 
 .footer-moving-bus {
+
   animation: footerBusDrive 14s linear infinite;
 
   filter:
+
     drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 
   will-change: left, transform;
+
 }
 
 /* Route stop indicators */
 
 .footer-route-stop {
+
   width: 9px;
+
   height: 9px;
 
   border: 2px solid #ffffff;
+
   border-radius: 50%;
 
   background: var(--primary);
@@ -465,201 +719,295 @@ a {
   transform: translateY(-50%);
 
   box-shadow:
+
     0 0 0 4px rgba(255, 255, 255, 0.12);
+
 }
 
 @media (hover: hover) {
+
   footer .footer-moving-bus {
+
     animation-duration: 14s;
+
   }
 
   footer:hover .footer-moving-bus {
+
     animation-duration: 10s;
+
   }
+
 }
 
 /* ==========================================
+
    TRANSPORT SCENE
+
 ========================================== */
 
 .transport-scene {
+
   display: block;
 
   width: 100%;
+
   height: 100%;
 
   transform-origin: center center;
+
   transform: none;
 
   transition:
+
     transform 700ms var(--transition-smooth);
+
 }
 
 .transport-scene.is-perspective {
+
   transform:
+
     perspective(1400px)
+
     rotateX(8deg)
+
     scale(1.025);
+
 }
 
 /* ==========================================
+
    MAPLIBRE — BASE MAP
+
 ========================================== */
 
 .maplibregl-map {
+
   position: relative;
 
   width: 100%;
+
   height: 100%;
 
   overflow: hidden;
 
   font-family: inherit;
+
 }
 
 /* The map container must have a defined height */
 
 .dp-map,
+
 .dp-map.maplibregl-map {
+
   width: 100%;
+
   height: 100%;
+
   min-width: 0;
+
   overflow: hidden;
+
 }
 
 .dp-map .maplibregl-canvas-container {
+
   width: 100%;
+
   height: 100%;
+
 }
 
 .dp-map .maplibregl-canvas {
+
   display: block;
+
   max-width: none !important;
+
 }
 
 /* Keep map controls readable */
 
 .maplibregl-ctrl-bottom-left,
+
 .maplibregl-ctrl-bottom-right {
+
   transform: scale(0.92);
+
   transform-origin: bottom left;
+
 }
 
 .maplibregl-ctrl-bottom-right {
+
   transform-origin: bottom right;
+
 }
 
 .maplibregl-ctrl-attrib {
+
   font-size: 10px !important;
+
 }
 
 .maplibregl-ctrl-attrib a {
+
   color: #475569;
+
 }
 
 .maplibregl-ctrl button {
+
   cursor: pointer;
+
 }
 
 /* Map popup */
 
 .maplibregl-popup-content {
+
   padding: 12px 16px;
 
   border-radius: 12px;
 
   color: #17202d;
+
   font-family: inherit;
+
   font-size: 12px;
 
   box-shadow:
+
     0 8px 24px rgba(15, 23, 42, 0.12);
+
 }
 
 .maplibregl-popup-close-button {
+
   padding: 5px 8px;
+
   color: #475569;
+
   font-size: 17px;
+
 }
 
 .maplibregl-popup-tip {
+
   border-top-color: #ffffff;
+
 }
 
 /* ==========================================
+
    MAPLIBRE — RESPONSIVE ATTRIBUTION
+
 ========================================== */
 
 /* Lift attribution above the information panel */
 
 .dp-map .maplibregl-ctrl-bottom-right,
+
 .dp-map .maplibregl-ctrl-bottom-left {
+
   bottom: 115px;
+
 }
 
 /* ==========================================
+
    VEHICLE MARKERS — SHARED STYLES
+
 ========================================== */
 
 .vehicle-marker {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   pointer-events: none;
+
   will-change: transform;
+
 }
 
 .vehicle-body {
+
   position: relative;
+
   transform-origin: center center;
 
   box-shadow:
+
     0 2px 8px rgba(15, 23, 42, 0.28),
+
     0 0 0 1px rgba(255, 255, 255, 0.92) inset;
+
 }
 
 /* ==========================================
+
    VEHICLE — CAR
+
 ========================================== */
 
 .vehicle-car {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   width: 22px;
+
   height: 22px;
+
 }
 
 .vehicle-car .vehicle-body {
+
   width: 18px;
+
   height: 10px;
 
   border-radius: 999px 999px 6px 6px;
 
   background: var(--vehicle-color, #dc2626);
+
 }
 
 .vehicle-car .vehicle-body::before {
+
   content: "";
 
   position: absolute;
+
   inset: 2px 4px;
 
   border-radius: 999px 999px 4px 4px;
 
   background: rgba(22, 32, 45, 0.75);
+
 }
 
 .vehicle-car .vehicle-body::after {
+
   content: "";
 
   position: absolute;
+
   top: 3px;
+
   right: 1px;
 
   width: 2px;
+
   height: 4px;
 
   border-radius: 2px;
@@ -667,38 +1015,53 @@ a {
   background: #fff3c4;
 
   box-shadow:
+
     0 0 0 1px rgba(255, 243, 196, 0.5);
+
 }
 
 /* ==========================================
+
    VEHICLE — BUS
+
 ========================================== */
 
 .vehicle-bus {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   width: 28px;
+
   height: 28px;
+
 }
 
 .vehicle-bus .vehicle-body {
+
   width: 24px;
+
   height: 12px;
 
   border-radius: 4px;
 
   background: var(--vehicle-color, #ffffff);
+
 }
 
 .vehicle-bus .vehicle-body::before {
+
   content: "";
 
   position: absolute;
 
   top: 2px;
+
   left: 3px;
+
   right: 5px;
 
   height: 5px;
@@ -706,31 +1069,53 @@ a {
   border-radius: 2px;
 
   background:
+
     linear-gradient(
+
       to right,
+
       rgba(35, 55, 70, 0.95) 0%,
+
       rgba(35, 55, 70, 0.95) 22%,
+
       transparent 22%,
+
       transparent 26%,
+
       rgba(35, 55, 70, 0.95) 26%,
+
       rgba(35, 55, 70, 0.95) 48%,
+
       transparent 48%,
+
       transparent 52%,
+
       rgba(35, 55, 70, 0.95) 52%,
+
       rgba(35, 55, 70, 0.95) 74%,
+
       transparent 74%,
+
       transparent 78%,
+
       rgba(35, 55, 70, 0.95) 78%,
+
       rgba(35, 55, 70, 0.95) 100%
+
     );
+
 }
 
 .vehicle-bus .vehicle-body::after {
+
   content: "";
 
   position: absolute;
+
   bottom: 1px;
+
   left: 2px;
+
   right: 2px;
 
   height: 3px;
@@ -738,36 +1123,51 @@ a {
   border-radius: 2px;
 
   background: var(--vehicle-accent, #b91c1c);
+
 }
 
 /* ==========================================
+
    VEHICLE — FEEDER
+
 ========================================== */
 
 .vehicle-feeder {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   width: 24px;
+
   height: 24px;
+
 }
 
 .vehicle-feeder .vehicle-body {
+
   width: 18px;
+
   height: 9px;
 
   border-radius: 4px;
 
   background: var(--vehicle-color, #fde68a);
+
 }
 
 .vehicle-feeder .vehicle-body::before {
+
   content: "";
 
   position: absolute;
+
   top: 2px;
+
   left: 3px;
+
   right: 4px;
 
   height: 4px;
@@ -775,14 +1175,19 @@ a {
   border-radius: 2px;
 
   background: rgba(35, 55, 70, 0.85);
+
 }
 
 .vehicle-feeder .vehicle-body::after {
+
   content: "";
 
   position: absolute;
+
   bottom: 1px;
+
   left: 2px;
+
   right: 2px;
 
   height: 2px;
@@ -790,195 +1195,1233 @@ a {
   border-radius: 2px;
 
   background: var(--vehicle-accent, #b91c1c);
+
 }
 
 /* ==========================================
+
    VEHICLE — MOTORCYCLE
+
 ========================================== */
 
 .vehicle-motor {
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   width: 18px;
+
   height: 18px;
+
 }
 
 .vehicle-motor .vehicle-body {
+
   width: 12px;
+
   height: 6px;
 
   border-radius: 999px;
 
   background: var(--vehicle-color, #111827);
+
 }
 
 .vehicle-motor .vehicle-body::before,
+
 .vehicle-motor .vehicle-body::after {
+
   content: "";
 
   position: absolute;
+
   top: 1px;
 
   width: 3px;
+
   height: 3px;
 
   border-radius: 999px;
 
   background: #0f172a;
+
 }
 
 .vehicle-motor .vehicle-body::before {
+
   left: -2px;
+
 }
 
 .vehicle-motor .vehicle-body::after {
+
   right: -2px;
+
 }
 
 /* ==========================================
+
    MAP — STOP MARKERS
+
 ========================================== */
 
 .map-stop-marker {
+
   width: 16px;
+
   height: 16px;
 
   border: 3px solid var(--primary);
+
   border-radius: 50%;
 
   background: #ffffff;
 
   box-shadow:
+
     0 2px 8px rgba(0, 0, 0, 0.2);
 
   cursor: pointer;
+
 }
 
 /* ==========================================
+
    MOBILE RESPONSIVENESS
+
 ========================================== */
 
 @media (max-width: 640px) {
+
   html {
+
     scroll-padding-top: 88px;
+
   }
 
   .network-stage.network-tilt {
+
     transform:
+
       perspective(900px)
+
       rotateX(12deg)
+
       rotateZ(-5deg)
+
       scale(1.55);
+
   }
 
   .feature-card:hover {
+
     transform: translateY(-3px);
+
   }
 
   .tmd-orbit-bus-second {
+
     display: none;
+
   }
 
   .tmd-orbit-bus {
+
     animation-duration: 22s;
+
   }
 
   .tmd-orbit-track {
+
     opacity: 0.45;
+
   }
 
   .footer-moving-bus {
+
     animation-duration: 11s;
+
   }
 
   .transport-scene.is-perspective {
+
     transform:
+
       perspective(1200px)
+
       rotateX(5deg)
+
       scale(1.01);
+
   }
 
   .dp-map .maplibregl-ctrl-bottom-right,
+
   .dp-map .maplibregl-ctrl-bottom-left {
+
     bottom: 150px;
+
   }
 
   .dp-map .maplibregl-ctrl-attrib {
+
     max-width: 180px;
+
     white-space: normal;
+
   }
+
 }
 
 /* Small phones */
 
 @media (max-width: 380px) {
+
   .tmd-orbit-bus {
+
     width: 36px;
+
     height: 19px;
+
   }
 
   .dp-map .maplibregl-ctrl-bottom-right,
+
   .dp-map .maplibregl-ctrl-bottom-left {
+
     bottom: 160px;
+
   }
+
 }
 
 /* Tablet layouts */
 
 @media (min-width: 641px) and (max-width: 1024px) {
+
   .network-stage.network-tilt {
+
     transform:
+
       perspective(1000px)
+
       rotateX(12deg)
+
       rotateZ(-4deg)
+
       scale(1.12);
+
   }
 
   .dp-map .maplibregl-ctrl-bottom-right,
+
   .dp-map .maplibregl-ctrl-bottom-left {
+
     bottom: 125px;
+
+  }
+
+}
+
+/* ==========================================
+
+   ACCESSIBILITY — REDUCED MOTION
+
+========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+
+  *::before,
+
+  *::after {
+
+    animation-duration: 0.01ms !important;
+
+    animation-iteration-count: 1 !important;
+
+    transition-duration: 0.01ms !important;
+
+    scroll-behavior: auto !important;
+
+  }
+
+  .reveal-item {
+
+    opacity: 1;
+
+    transform: none;
+
+    transition: none;
+
+  }
+
+  .hero-orb,
+
+  .scroll-arrow,
+
+  .route-flow,
+
+  .node-pulse,
+
+  .tmd-orbit-bus,
+
+  .footer-moving-bus {
+
+    animation: none !important;
+
+  }
+
+  .transport-scene,
+
+  .network-stage {
+
+    transition: none !important;
+
+  }
+
+  .vehicle-marker,
+
+  .vehicle-body {
+
+    animation: none !important;
+
+    transition: none !important;
+
+  }
+
+}
+
+/* ==========================================
+   DEWATAMOVE 2041 — BALI HERITAGE FOOTER
+   Compatible with Footer.jsx (.dmf-*)
+========================================== */
+
+/* Premium red and gold CTA */
+.dmf-cta {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 80% 18%, rgba(248, 198, 107, 0.16), transparent 37%),
+    radial-gradient(circle at 12% 95%, rgba(255, 215, 140, 0.08), transparent 35%),
+    linear-gradient(125deg, #b91c1c 0%, #a71923 45%, #74151b 100%);
+  box-shadow: 0 30px 70px rgba(127, 29, 29, 0.11);
+}
+
+.dmf-texture {
+  background-image: radial-gradient(rgba(255, 231, 184, 0.24) 0.75px, transparent 0.75px);
+  background-size: 20px 20px;
+  opacity: 0.38;
+}
+
+.dmf-gold-text {
+  display: inline-block;
+  background: linear-gradient(100deg, #fff1cb 0%, #f9d58d 38%, #efb55f 68%, #ffe8b1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #f9d58d;
+}
+
+/* Three independent parallax layers */
+.dmf-parallax-gate {
+  transform: translate3d(
+    var(--dmf-gate-x, 0px),
+    calc(var(--dmf-gate-y, 0px) + var(--dmf-scroll-gate, 0px)),
+    0
+  );
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.dmf-parallax-mandala {
+  transform: translate3d(
+    var(--dmf-mandala-x, 0px),
+    calc(var(--dmf-mandala-y, 0px) + var(--dmf-scroll-mandala, 0px)),
+    0
+  );
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.dmf-parallax-flower {
+  transform: translate3d(
+    var(--dmf-flower-x, 0px),
+    calc(var(--dmf-flower-y, 0px) + var(--dmf-scroll-flower, 0px)),
+    0
+  );
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.dmf-parallax-mandala svg {
+  transform-origin: center;
+  animation: dmfMandalaRotate 60s linear infinite;
+}
+
+@keyframes dmfMandalaRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.dmf-parallax-flower svg {
+  transform-origin: center;
+  animation: dmfFlowerFloat 7s ease-in-out infinite;
+}
+
+@keyframes dmfFlowerFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(10deg); }
+}
+
+/* CTA chips */
+.dmf-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 250ms ease, border-color 250ms ease, transform 250ms ease;
+}
+
+.dmf-feature-chip svg { color: #f8d99c; }
+
+@media (hover: hover) {
+  .dmf-feature-chip:hover {
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(248, 217, 156, 0.5);
+  }
+}
+
+/* CTA buttons */
+.dmf-primary-button,
+.dmf-secondary-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.dmf-primary-button::before,
+.dmf-secondary-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    110deg, transparent 20%, rgba(255, 255, 255, 0.3) 50%, transparent 80%
+  );
+  transform: translateX(-150%);
+  transition: transform 650ms ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .dmf-primary-button:hover::before,
+  .dmf-secondary-button:hover::before {
+    transform: translateX(150%);
+  }
+}
+
+.dmf-primary-button:active,
+.dmf-secondary-button:active {
+  transform: scale(0.98);
+}
+
+/* Four route stops and moving bus */
+.dmf-route-line {
+  height: 1px;
+  border-top: 1px dashed rgba(249, 213, 139, 0.5);
+  transform: translateY(-50%);
+}
+
+.dmf-route-stop {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #f9d58b;
+  border-radius: 50%;
+  background: #9e1e24;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgba(249, 213, 139, 0.1);
+  animation: dmfStopPulse 3s ease-in-out infinite;
+}
+
+.dmf-route-stop:nth-of-type(2) { animation-delay: 0.6s; }
+.dmf-route-stop:nth-of-type(3) { animation-delay: 1.2s; }
+.dmf-route-stop:nth-of-type(4) { animation-delay: 1.8s; }
+
+@keyframes dmfStopPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(249, 213, 139, 0.1); }
+  50% { box-shadow: 0 0 0 10px rgba(249, 213, 139, 0); }
+}
+
+.dmf-moving-bus {
+  left: 0%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 8px rgba(255, 223, 155, 0.45));
+  animation: dmfBusDrive 12s linear infinite;
+  will-change: left, transform;
+}
+
+@keyframes dmfBusDrive {
+  0% { left: 0%; opacity: 0; transform: translate(-50%, -50%); }
+  5% { opacity: 1; }
+  32% { left: 33.33%; }
+  65% { left: 66.66%; }
+  95% { opacity: 1; }
+  100% { left: 100%; opacity: 0; transform: translate(-50%, -50%); }
+}
+
+@media (hover: hover) {
+  .dmf-cta:hover .dmf-moving-bus { animation-duration: 8s; }
+}
+
+/* ==========================================
+   BALI FOOTER — WARM LIGHT THEME
+   Cream + burgundy + restrained gold
+========================================== */
+.dmf-footer-main {
+  position: relative;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(185, 28, 28, 0.055), transparent 38%),
+    radial-gradient(circle at 90% 95%, rgba(213, 148, 54, 0.13), transparent 38%),
+    linear-gradient(145deg, #fffdf9 0%, #fff7ee 54%, #faeddd 100%);
+  color: #432a29;
+}
+
+.dmf-footer-main::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(164, 39, 45, 0.38), #d4a35b, transparent);
+}
+
+/* Existing Tailwind utility colors were designed for a dark footer.
+   Override only within this component to preserve the rest of the website. */
+.dmf-footer-main .text-white {
+  color: #3e2525;
+}
+
+.dmf-footer-main .text-slate-400 {
+  color: #6e5b57;
+}
+
+.dmf-footer-main .text-slate-500 {
+  color: #806a63;
+}
+
+.dmf-footer-main [class*="text-[#E8B967]"] {
+  color: #a6232c;
+}
+
+.dmf-footer-main [class*="border-[#E8B967]"] {
+  border-color: rgba(166, 35, 44, 0.22);
+}
+
+.dmf-footer-main [class*="bg-[#E8B967]"] {
+  background-color: rgba(166, 35, 44, 0.055);
+}
+
+.dmf-brand-mark {
+  color: #a6232c;
+  border: 1px solid rgba(166, 35, 44, 0.22);
+  background: linear-gradient(135deg, #fff4df, #fbe8d0);
+  box-shadow: 0 8px 20px rgba(127, 50, 30, 0.08);
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+
+@media (hover: hover) {
+  .dmf-brand-mark:hover,
+  button:hover > .dmf-brand-mark {
+    transform: translateY(-3px) rotate(-4deg);
+    box-shadow: 0 12px 28px rgba(166, 35, 44, 0.14);
+  }
+}
+
+.dmf-column-title {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 13px;
+  color: #422826;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.dmf-column-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 27px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ab2930, #d4a35b);
+}
+
+.dmf-footer-link {
+  position: relative;
+  width: fit-content;
+  line-height: 1.7;
+  transition: color 250ms ease, transform 250ms ease;
+}
+
+@media (hover: hover) {
+  .dmf-footer-main .dmf-footer-link:hover {
+    color: #a11c27;
+    transform: translateX(3px);
+  }
+}
+
+.dmf-footer-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(149, 83, 64, 0.19) 15%,
+    rgba(166, 35, 44, 0.25) 50%,
+    rgba(149, 83, 64, 0.19) 85%,
+    transparent
+  );
+}
+
+/* Footer screen adaptations */
+@media (max-width: 640px) {
+  .dmf-cta { box-shadow: 0 16px 35px rgba(127, 29, 29, 0.1); }
+  .dmf-parallax-gate { opacity: 0.23; }
+  .dmf-parallax-mandala { opacity: 0.35; }
+  .dmf-parallax-flower { opacity: 0.3; }
+  .dmf-feature-chip { padding: 7px 10px; font-size: 10px; }
+  .dmf-moving-bus { animation-duration: 11s; }
+  .dmf-footer-main { background: linear-gradient(155deg, #fffdf9, #fff5e9 60%, #faeddd); }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dmf-parallax-gate { opacity: 0.35; }
+  .dmf-parallax-flower { opacity: 0.5; }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .dmf-parallax-gate,
+  .dmf-parallax-mandala,
+  .dmf-parallax-flower {
+    transform: none !important;
+    transition: none !important;
+    will-change: auto;
+  }
+
+  .dmf-parallax-mandala svg,
+  .dmf-parallax-flower svg,
+  .dmf-moving-bus,
+  .dmf-route-stop {
+    animation: none !important;
+    will-change: auto;
+  }
+
+  .dmf-primary-button::before,
+  .dmf-secondary-button::before { transition: none !important; }
+}
+/* END BALI HERITAGE FOOTER */
+
+
+/* ==========================================
+   DEWATAMOVE 2041
+   BALI HERITAGE HEADER — LIGHT EDITION
+========================================== */
+
+/* ==========================================
+   1. HEADER MAIN BACKGROUND
+========================================== */
+
+.tmd-header.dmh-header {
+  color: #532b28;
+
+  background:
+    radial-gradient(
+      circle at 85% 0%,
+      rgba(225, 175, 101, 0.15),
+      transparent 35%
+    ),
+    linear-gradient(
+      115deg,
+      #fffdf8 0%,
+      #fff7eb 55%,
+      #f9ead5 100%
+    );
+
+  border-bottom:
+    1px solid rgba(190, 143, 79, 0.25);
+
+  box-shadow:
+    0 4px 25px rgba(93, 50, 35, 0.06);
+
+  isolation: isolate;
+}
+
+/* SCROLLED FLOATING HEADER */
+
+.tmd-header.dmh-header[data-scrolled="true"] {
+  background:
+    linear-gradient(
+      110deg,
+      rgba(255, 253, 248, 0.97),
+      rgba(255, 244, 228, 0.97)
+    );
+
+  border:
+    1px solid rgba(204, 164, 108, 0.42);
+
+  box-shadow:
+    0 14px 45px rgba(89, 54, 37, 0.12),
+    0 2px 8px rgba(89, 54, 37, 0.05);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* HIDE ORNAMENT OVERFLOW WITHOUT
+   CLIPPING NAVIGATION DROPDOWNS */
+
+.dmh-header-texture {
+  border-radius: inherit;
+
+  background-image:
+    radial-gradient(
+      rgba(167, 110, 48, 0.2) 0.7px,
+      transparent 0.7px
+    );
+
+  background-size: 19px 19px;
+
+  opacity: 0.27;
+
+  overflow: hidden;
+}
+
+.dmh-header-glow {
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 10%,
+      rgba(255, 255, 255, 0.35) 45%,
+      transparent 85%
+    );
+}
+
+/* ==========================================
+   2. ANIMATED BALI MANDALA
+========================================== */
+
+.dmh-header-mandala {
+  color: rgba(178, 120, 51, 0.24);
+
+  transform: translate3d(
+    var(--dmh-mouse-x, 0px),
+    var(--dmh-mouse-y, 0px),
+    0
+  );
+
+  transition:
+    transform 300ms ease-out;
+
+  will-change: transform;
+}
+
+.dmh-header-mandala svg {
+  width: 100%;
+  height: 100%;
+
+  transform-origin: center;
+
+  animation:
+    dmhMandalaRotate 65s linear infinite;
+}
+
+@keyframes dmhMandalaRotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }
 
 /* ==========================================
-   ACCESSIBILITY — REDUCED MOTION
+   3. BRAND SYMBOL
+========================================== */
+
+.dmh-brand-icon {
+  position: relative;
+
+  color: #f9d68e;
+
+  background:
+    linear-gradient(
+      145deg,
+      #b91c1c,
+      #871a23
+    );
+
+  border:
+    1px solid rgba(135, 26, 35, 0.2);
+
+  box-shadow:
+    0 5px 15px rgba(135, 26, 35, 0.16);
+
+  transition:
+    transform 350ms ease,
+    box-shadow 350ms ease;
+}
+
+.dmh-brand-icon::after {
+  content: "";
+
+  position: absolute;
+  inset: 4px;
+
+  border:
+    1px solid rgba(255, 225, 169, 0.18);
+
+  border-radius: 8px;
+
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .dmh-brand:hover .dmh-brand-icon {
+    transform:
+      translateY(-2px)
+      rotate(-7deg);
+
+    box-shadow:
+      0 10px 24px rgba(135, 26, 35, 0.23);
+  }
+}
+
+/* BRAND TEXT */
+
+.dmh-brand-name {
+  color: #522c29;
+
+  transition: color 250ms ease;
+}
+
+.dmh-brand-accent {
+  color: #ae2831;
+}
+
+.dmh-brand-subtitle {
+  color: #ad8054;
+}
+
+/* ==========================================
+   4. TRANS METRO DEWATA LOGO
+========================================== */
+
+.dmh-tmd-logo {
+  background:
+    rgba(255, 255, 255, 0.72);
+
+  border:
+    1px solid rgba(194, 150, 93, 0.3);
+
+  color: #a52630;
+
+  box-shadow:
+    0 3px 12px rgba(91, 54, 32, 0.06);
+
+  transition:
+    background 250ms ease,
+    border-color 250ms ease,
+    box-shadow 250ms ease;
+}
+
+.dmh-tmd-logo:hover {
+  background: #ffffff;
+
+  border-color:
+    rgba(194, 150, 93, 0.55);
+
+  box-shadow:
+    0 5px 16px rgba(91, 54, 32, 0.09);
+}
+
+/* ==========================================
+   5. DESKTOP NAVIGATION
+========================================== */
+
+.dmh-nav-link {
+  position: relative;
+
+  color: #68443b;
+
+  background: transparent;
+
+  border:
+    1px solid transparent;
+
+  transition:
+    color 250ms ease,
+    background-color 250ms ease,
+    border-color 250ms ease,
+    transform 250ms ease;
+}
+
+@media (hover: hover) {
+  .dmh-nav-link:hover {
+    color: #a51f2b;
+
+    background:
+      rgba(174, 40, 49, 0.06);
+
+    transform: translateY(-1px);
+  }
+}
+
+/* ACTIVE PAGE */
+
+.dmh-nav-link[data-active="true"] {
+  color: #a51f2b;
+
+  background:
+    rgba(174, 40, 49, 0.08);
+
+  border-color:
+    rgba(174, 40, 49, 0.08);
+}
+
+.dmh-nav-link[data-active="true"]::after {
+  content: "";
+
+  position: absolute;
+
+  left: 24%;
+  right: 24%;
+  bottom: 3px;
+
+  height: 2px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #bf8a4d,
+      #e9c184,
+      #bf8a4d
+    );
+}
+
+/* ==========================================
+   6. DESKTOP DROPDOWN
+========================================== */
+
+.dmh-dropdown {
+  overflow: hidden;
+
+  color: #542c29;
+
+  background:
+    linear-gradient(
+      155deg,
+      #fffefa 0%,
+      #fff5e8 100%
+    );
+
+  border:
+    1px solid rgba(194, 150, 93, 0.3);
+
+  box-shadow:
+    0 20px 50px rgba(81, 42, 30, 0.14);
+
+  animation:
+    dmhDropdownEnter 250ms ease-out both;
+}
+
+@keyframes dmhDropdownEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(-8px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0) scale(1);
+  }
+}
+
+.dmh-dropdown-heading {
+  color: #b17d49;
+
+  border-bottom:
+    1px solid rgba(194, 150, 93, 0.16);
+
+  margin-bottom: 5px;
+}
+
+.dmh-dropdown-link {
+  color: #68443b;
+
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
+}
+
+.dmh-dropdown-link:hover {
+  color: #aa2630;
+
+  background:
+    rgba(174, 40, 49, 0.07);
+
+  transform: translateX(3px);
+}
+
+.dmh-dropdown-link[data-active="true"] {
+  color: #a51f2b;
+
+  background:
+    rgba(174, 40, 49, 0.1);
+
+  font-weight: 700;
+}
+
+/* ==========================================
+   7. MOBILE MENU BUTTON
+========================================== */
+
+.dmh-menu-button {
+  color: #a52630;
+
+  background:
+    rgba(174, 40, 49, 0.06);
+
+  border:
+    1px solid rgba(174, 40, 49, 0.15);
+}
+
+.dmh-menu-button:hover {
+  color: #ffffff;
+
+  background: #a52630;
+
+  border-color: #a52630;
+
+  transform: rotate(4deg);
+}
+
+.dmh-menu-button:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================
+   8. MOBILE DROPDOWN PANEL
+========================================== */
+
+.dmh-mobile-panel {
+  color: #532b28;
+
+  background:
+    linear-gradient(
+      155deg,
+      #fffdf8,
+      #fff4e7
+    );
+
+  border:
+    1px solid rgba(194, 150, 93, 0.35);
+
+  box-shadow:
+    0 20px 50px rgba(87, 47, 31, 0.16);
+
+  animation:
+    dmhMobileEnter 300ms
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes dmhMobileEnter {
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(-10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0) scale(1);
+  }
+}
+
+/* MOBILE HEADING */
+
+.dmh-mobile-heading {
+  color: #a16e41;
+
+  background:
+    rgba(232, 185, 103, 0.09);
+
+  border-bottom:
+    1px solid rgba(194, 150, 93, 0.2);
+}
+
+/* MOBILE LINKS */
+
+.dmh-mobile-link {
+  color: #634137;
+
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
+}
+
+.dmh-mobile-link:hover {
+  color: #a52630;
+
+  background:
+    rgba(174, 40, 49, 0.06);
+}
+
+.dmh-mobile-link[data-active="true"] {
+  color: #a52630;
+
+  background:
+    rgba(174, 40, 49, 0.09);
+
+  font-weight: 700;
+}
+
+.dmh-mobile-submenu {
+  border-color:
+    rgba(194, 150, 93, 0.4);
+}
+
+.dmh-mobile-bottom {
+  color: #a16e41;
+
+  background:
+    rgba(232, 185, 103, 0.09);
+
+  border-top:
+    1px solid rgba(194, 150, 93, 0.2);
+}
+
+/* ==========================================
+   9. ANIMATED BUS ORBIT — LIGHT THEME
+========================================== */
+
+/* Override previous white orbit track */
+
+.dmh-header .tmd-orbit-track {
+  border-color:
+    rgba(159, 92, 53, 0.24);
+}
+
+/* Animated buses */
+
+.dmh-header .tmd-orbit-bus {
+  color: #a52630;
+
+  filter:
+    drop-shadow(
+      0 2px 4px rgba(107, 57, 35, 0.15)
+    );
+}
+
+/* Bus icon inherits dark-red theme
+   when using currentColor */
+
+.dmh-header .tmd-orbit-bus svg {
+  color: #a52630;
+}
+
+/* ==========================================
+   10. FOCUS ACCESSIBILITY
+========================================== */
+
+.dmh-header button:focus-visible {
+  outline:
+    2px solid #a52630;
+
+  outline-offset: 3px;
+}
+
+/* ==========================================
+   11. RESPONSIVE
+========================================== */
+
+@media (max-width: 640px) {
+  .dmh-header-mandala {
+    opacity: 0.35;
+  }
+
+  .dmh-brand-icon {
+    width: 37px;
+    height: 37px;
+  }
+
+  .dmh-brand-name {
+    letter-spacing: -0.025em;
+  }
+
+  .dmh-mobile-panel {
+    border-radius: 20px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dmh-header-mandala {
+    opacity: 0.55;
+  }
+}
+
+/* ==========================================
+   12. REDUCED MOTION
 ========================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  .reveal-item {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-
-  .hero-orb,
-  .scroll-arrow,
-  .route-flow,
-  .node-pulse,
-  .tmd-orbit-bus,
-  .footer-moving-bus {
-    animation: none !important;
-  }
-
-  .transport-scene,
-  .network-stage {
-    transition: none !important;
-  }
-
-  .vehicle-marker,
-  .vehicle-body {
+  .dmh-header-mandala,
+  .dmh-header-mandala svg,
+  .dmh-dropdown,
+  .dmh-mobile-panel,
+  .dmh-brand-icon,
+  .dmh-nav-link {
     animation: none !important;
     transition: none !important;
+  }
+
+  .dmh-header-mandala {
+    transform: none !important;
+    will-change: auto;
   }
 }
+
+/* ==========================================
+   END — BALI HERITAGE HEADER
+========================================== */

@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 import {
   Database,
@@ -17,31 +16,9 @@ import {
   MousePointerClick,
 } from "lucide-react";
 
-import {
-  zoneNames,
-  mat2026,
-  matTotal,
-} from "../data/mobility";
+import { zoneNames, mat2026, matTotal } from "../data/mobility";
 
-/*
- * DEWATAMOVE 2041 — DATA EXPLORER
- *
- * Dashboard data transportasi yang mudah dibaca.
- *
- * React + Vite + Tailwind CSS.
- * Tidak membutuhkan library chart tambahan.
- *
- * Sumber angka mengikuti DataExplorer sebelumnya:
- * - ToR ITEC-U
- * - Data Sekunder
- * - Case Collaborator WRI Indonesia
- * - Inventarisasi GRK Denpasar
- *
- * Perhatikan:
- * - Satuan tabel emisi belum dikonfirmasi.
- * - Mode share Bali bukan hasil survei Denpasar 2026.
- * - Simulasi TDM adalah asumsi sensitivitas.
- */
+
 
 const YEARS = [2019, 2020, 2021, 2022, 2023, 2024];
 
@@ -74,10 +51,7 @@ const SECTORS = [
   { name: "Rumah tangga", value: 187.83, color: "#f59e0b" },
 ];
 
-const SECTOR_TOTAL = SECTORS.reduce(
-  (sum, item) => sum + item.value,
-  0
-);
+const SECTOR_TOTAL = SECTORS.reduce((sum, item) => sum + item.value, 0);
 
 const MODES = [
   { name: "Sepeda motor", value: 62.25345721582618, color: "#b91c1c" },
@@ -98,10 +72,7 @@ const TMD = [
   { id: 6, route: "Kuta – Nusa Dua", passengers: 11737, lf: 14.99 },
 ];
 
-const TOTAL_TMD = TMD.reduce(
-  (sum, item) => sum + item.passengers,
-  0
-);
+const TOTAL_TMD = TMD.reduce((sum, item) => sum + item.passengers, 0);
 
 const FUELS = {
   ron88: {
@@ -162,32 +133,20 @@ const fmt = (value, decimals = 2) =>
     maximumFractionDigits: decimals,
   }).format(value ?? 0);
 
-const pct = (value, digits = 2) =>
-  `${fmt(value, digits)}%`;
+const pct = (value, digits = 2) => `${fmt(value, digits)}%`;
 
-const clamp = (v, min, max) =>
-  Math.min(max, Math.max(min, v));
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
-const zid = (i) =>
-  `Z${String(i + 1).padStart(2, "0")}`;
+const zid = (i) => `Z${String(i + 1).padStart(2, "0")}`;
 
 const deltaPercent = (current, previous) =>
-  previous > 0
-    ? ((current - previous) / previous) * 100
-    : null;
+  previous > 0 ? ((current - previous) / previous) * 100 : null;
 
 /* =========================================
    KOMPONEN VISUAL
 ========================================= */
 
-function SectionTitle({
-  id,
-  number,
-  icon: Icon,
-  eyebrow,
-  title,
-  description,
-}) {
+function SectionTitle({ id, number, icon: Icon, eyebrow, title, description }) {
   return (
     <div id={id} className="scroll-mt-24">
       <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-red-700">
@@ -218,14 +177,10 @@ function KpiCard({ icon: Icon, label, value, unit, note }) {
         {value}
       </p>
 
-      <p className="mt-1 text-xs font-medium text-slate-600">
-        {unit}
-      </p>
+      <p className="mt-1 text-xs font-medium text-slate-600">{unit}</p>
 
       {note && (
-        <p className="mt-3 text-[11px] leading-5 text-slate-400">
-          {note}
-        </p>
+        <p className="mt-3 text-[11px] leading-5 text-slate-400">{note}</p>
       )}
     </div>
   );
@@ -236,14 +191,10 @@ function ChartCard({ title, subtitle, children }) {
     <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:rounded-3xl sm:p-6">
       {(title || subtitle) && (
         <div className="mb-5">
-          <h3 className="text-base font-bold text-slate-900">
-            {title}
-          </h3>
+          <h3 className="text-base font-bold text-slate-900">{title}</h3>
 
           {subtitle && (
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              {subtitle}
-            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>
           )}
         </div>
       )}
@@ -261,9 +212,7 @@ function Explanation({ title = "Cara membaca data", children }) {
         {title}
       </p>
 
-      <p className="mt-2 text-xs leading-6 text-slate-600">
-        {children}
-      </p>
+      <p className="mt-2 text-xs leading-6 text-slate-600">{children}</p>
     </div>
   );
 }
@@ -303,31 +252,24 @@ function LineChart({
     y: top + plotH * (1 - values[index] / yMax),
   }));
 
-  const line = points
-    .map((p) => `${p.x},${p.y}`)
-    .join(" ");
+  const line = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   const active =
-    points.find((p) => p.year === selectedYear) ??
-    points[points.length - 1];
+    points.find((p) => p.year === selectedYear) ?? points[points.length - 1];
 
   return (
     <div>
       <div className="mb-3 rounded-xl bg-slate-50 px-4 py-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="text-xs text-slate-500">
-              Nilai tahun {active.year}
-            </p>
+            <p className="text-xs text-slate-500">Nilai tahun {active.year}</p>
 
             <p className="mt-1 text-2xl font-black text-slate-900">
               {fmt(active.value)}
             </p>
           </div>
 
-          <span className="text-xs font-medium text-slate-500">
-            {unit}
-          </span>
+          <span className="text-xs font-medium text-slate-500">{unit}</span>
         </div>
       </div>
 
@@ -439,14 +381,8 @@ function LineChart({
   );
 }
 
-function ProgressBars({
-  items,
-  max,
-  suffix = "",
-  color = "#b91c1c",
-}) {
-  const maximum =
-    max ?? Math.max(1, ...items.map((item) => item.value));
+function ProgressBars({ items, max, suffix = "", color = "#b91c1c" }) {
+  const maximum = max ?? Math.max(1, ...items.map((item) => item.value));
 
   return (
     <div className="space-y-4">
@@ -458,7 +394,8 @@ function ProgressBars({
             </span>
 
             <span className="shrink-0 font-bold tabular-nums text-slate-900">
-              {fmt(item.value)}{suffix}
+              {fmt(item.value)}
+              {suffix}
             </span>
           </div>
 
@@ -513,9 +450,7 @@ function ModeDonut() {
             {pct(PRIVATE_SHARE, 1)}
           </p>
 
-          <p className="text-[10px] text-slate-400">
-            Bali 2024
-          </p>
+          <p className="text-[10px] text-slate-400">Bali 2024</p>
         </div>
       </div>
     </div>
@@ -547,40 +482,29 @@ export default function DataExplorer() {
   const [reduction, setReduction] = useState(12);
 
   const matrixSum = useMemo(
-    () =>
-      mat2026.flat().reduce(
-        (sum, value) => sum + Number(value || 0),
-        0
-      ),
-    []
+    () => mat2026.flat().reduce((sum, value) => sum + Number(value || 0), 0),
+    [],
   );
 
   const originTotals = useMemo(
     () =>
       mat2026.map((row) =>
-        row.reduce((sum, value) => sum + Number(value || 0), 0)
+        row.reduce((sum, value) => sum + Number(value || 0), 0),
       ),
-    []
+    [],
   );
 
   const destinationTotals = useMemo(
     () =>
       zoneNames.map((_, j) =>
-        mat2026.reduce(
-          (sum, row) => sum + Number(row[j] || 0),
-          0
-        )
+        mat2026.reduce((sum, row) => sum + Number(row[j] || 0), 0),
       ),
-    []
+    [],
   );
 
   const intraZonal = useMemo(
-    () =>
-      mat2026.reduce(
-        (sum, row, i) => sum + Number(row[i] || 0),
-        0
-      ),
-    []
+    () => mat2026.reduce((sum, row, i) => sum + Number(row[i] || 0), 0),
+    [],
   );
 
   const topOD = useMemo(
@@ -591,30 +515,25 @@ export default function DataExplorer() {
             i,
             j,
             value: Number(value || 0),
-          }))
+          })),
         )
         .filter((item) => item.i !== item.j)
         .sort((a, b) => b.value - a.value)
         .slice(0, 6),
-    []
+    [],
   );
 
   const maxCell = Math.max(1, ...mat2026.flat());
 
-  const selectedOD =
-    Number(
-      mat2026[selectedOrigin]?.[selectedDestination] || 0
-    );
+  const selectedOD = Number(
+    mat2026[selectedOrigin]?.[selectedDestination] || 0,
+  );
 
-  const selectedShare =
-    matrixSum > 0 ? (selectedOD / matrixSum) * 100 : 0;
+  const selectedShare = matrixSum > 0 ? (selectedOD / matrixSum) * 100 : 0;
 
   const currentEmission = EMISSION[emissionType];
 
-  const emissionYears =
-    emissionRange === "recent"
-      ? YEARS.slice(2)
-      : YEARS;
+  const emissionYears = emissionRange === "recent" ? YEARS.slice(2) : YEARS;
 
   const emissionValues =
     emissionRange === "recent"
@@ -625,9 +544,7 @@ export default function DataExplorer() {
   const emissionValue = currentEmission.values[emissionIndex];
 
   const previousEmission =
-    emissionIndex > 0
-      ? currentEmission.values[emissionIndex - 1]
-      : null;
+    emissionIndex > 0 ? currentEmission.values[emissionIndex - 1] : null;
 
   const emissionDelta =
     previousEmission == null
@@ -640,15 +557,13 @@ export default function DataExplorer() {
 
   const selectedGas = EMISSION[gasType];
 
-  const corridor =
-    TMD.find((item) => item.id === selectedCorridor) || TMD[0];
+  const corridor = TMD.find((item) => item.id === selectedCorridor) || TMD[0];
 
   const grk2024 = EMISSION.grk.values[5];
   const scenarioGRK = grk2024 * (1 - reduction / 100);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-white text-slate-900">
-
       {/* HERO */}
 
       <header className="relative overflow-hidden border-b border-slate-100 px-4 pb-12 pt-16 sm:px-8 sm:pb-16 sm:pt-24">
@@ -662,17 +577,14 @@ export default function DataExplorer() {
           <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
             Data yang berbicara.
             <br />
-            <span className="text-red-700">
-              Mobilitas yang dipahami.
-            </span>
+            <span className="text-red-700">Mobilitas yang dipahami.</span>
           </h1>
 
           <p className="mt-5 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-            Memahami tantangan transportasi Denpasar
-            melalui data perjalanan, pilihan moda,
-            layanan bus, penggunaan energi, dan emisi.
-            Setiap grafik dilengkapi penjelasan agar
-            angka lebih mudah diinterpretasikan.
+            Memahami tantangan transportasi Denpasar melalui data perjalanan,
+            pilihan moda, layanan bus, penggunaan energi, dan emisi. Setiap
+            grafik dilengkapi penjelasan agar angka lebih mudah
+            diinterpretasikan.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-2 text-[11px] font-semibold">
@@ -691,44 +603,36 @@ export default function DataExplorer() {
 
       {/* NAVIGASI */}
 
-  
-{/* NAVIGASI SECTION — TANPA PINDAH HALAMAN */}
+      {/* NAVIGASI SECTION — TANPA PINDAH HALAMAN */}
 
-<nav
-  aria-label="Navigasi analisis data"
-  className="sticky top-0 z-40 border-b border-slate-100 bg-white/95 shadow-sm backdrop-blur-md"
->
-  <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-3 sm:px-8">
-
-    {NAVIGATION.map((item) => (
-      <button
-        key={item.id}
-        type="button"
-        onClick={() => {
-          const section = document.getElementById(
-            item.id
-          );
-
-          if (section) {
-            section.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-          }
-        }}
-        className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition-all duration-300 hover:border-red-200 hover:bg-red-50 hover:text-red-700 active:scale-95"
+      <nav
+        aria-label="Navigasi analisis data"
+        className="sticky top-0 z-40 border-b border-slate-100 bg-white/95 shadow-sm backdrop-blur-md"
       >
-        {item.label}
-      </button>
-    ))}
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-3 sm:px-8">
+          {NAVIGATION.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                const section = document.getElementById(item.id);
 
-  </div>
-</nav>
-
-
+                if (section) {
+                  section.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }
+              }}
+              className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition-all duration-300 hover:border-red-200 hover:bg-red-50 hover:text-red-700 active:scale-95"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       <div className="mx-auto max-w-7xl space-y-20 px-4 pb-24 pt-10 sm:px-8 sm:pt-14">
-
         {/* RINGKASAN */}
 
         <section id="ringkasan" className="scroll-mt-24">
@@ -798,13 +702,9 @@ export default function DataExplorer() {
                 key={item.number}
                 className="rounded-2xl bg-slate-50 p-4 sm:p-5"
               >
-                <p className="text-xs font-black text-red-700">
-                  {item.number}
-                </p>
+                <p className="text-xs font-black text-red-700">{item.number}</p>
 
-                <h3 className="mt-2 text-sm font-bold">
-                  {item.title}
-                </h3>
+                <h3 className="mt-2 text-sm font-bold">{item.title}</h3>
 
                 <p className="mt-2 text-xs leading-6 text-slate-500">
                   {item.text}
@@ -814,11 +714,10 @@ export default function DataExplorer() {
           </div>
 
           <Explanation title="Panduan membaca dashboard">
-            Klik tahun pada grafik garis untuk membaca nilai
-            tertentu. Semakin panjang batang, semakin besar
-            nilainya. Pada matriks OD, warna merah yang lebih
-            kuat menunjukkan arus relatif lebih tinggi.
-            Perhatikan selalu tahun, wilayah, dan satuan data.
+            Klik tahun pada grafik garis untuk membaca nilai tertentu. Semakin
+            panjang batang, semakin besar nilainya. Pada matriks OD, warna merah
+            yang lebih kuat menunjukkan arus relatif lebih tinggi. Perhatikan
+            selalu tahun, wilayah, dan satuan data.
           </Explanation>
         </section>
 
@@ -894,16 +793,17 @@ export default function DataExplorer() {
                 <strong>{fmt(emissionValue)}</strong>.
                 {emissionDelta != null && (
                   <>
-                    {" "}Perubahannya{" "}
+                    {" "}
+                    Perubahannya{" "}
                     <strong>
                       {emissionDelta >= 0 ? "naik" : "turun"}{" "}
                       {pct(Math.abs(emissionDelta))}
                     </strong>{" "}
                     dibandingkan tahun sebelumnya.
                   </>
-                )}
-                {" "}Perubahan ini belum menunjukkan
-                penyebab ataupun efektivitas kebijakan tertentu.
+                )}{" "}
+                Perubahan ini belum menunjukkan penyebab ataupun efektivitas
+                kebijakan tertentu.
               </Explanation>
             </ChartCard>
 
@@ -924,10 +824,7 @@ export default function DataExplorer() {
                 ))}
               </div>
 
-              <ProgressBars
-                items={SECTORS}
-                max={SECTOR_TOTAL}
-              />
+              <ProgressBars items={SECTORS} max={SECTOR_TOTAL} />
 
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <p className="text-xs text-slate-500">
@@ -940,11 +837,10 @@ export default function DataExplorer() {
               </div>
 
               <Explanation>
-                Grafik membandingkan sektor berdasarkan
-                angka pada tabel GRK yang sama. Bagian
-                transportasi dihitung dari 891,97 dibagi
-                total 2.725,72. Ini bukan persentase CO₂
-                kendaraan terhadap seluruh emisi kota.
+                Grafik membandingkan sektor berdasarkan angka pada tabel GRK
+                yang sama. Bagian transportasi dihitung dari 891,97 dibagi total
+                2.725,72. Ini bukan persentase CO₂ kendaraan terhadap seluruh
+                emisi kota.
               </Explanation>
             </ChartCard>
           </div>
@@ -979,12 +875,11 @@ export default function DataExplorer() {
             />
 
             <Explanation title="Perhatikan satuan dan jenis gas">
-              Tabel sumber memakai label NO₂ dan NH₄,
-              sementara narasi ToR membahas CH₄ dan N₂O.
-              Notasi tersebut berbeda secara kimia.
-              Karena itu, nilainya ditampilkan terpisah,
-              tidak dijumlahkan ataupun dikonversi menjadi CO₂e.
-              Satuan asli juga masih perlu dikonfirmasi.
+              Tabel sumber memakai label NO₂ dan NH₄, sementara narasi ToR
+              membahas CH₄ dan N₂O. Notasi tersebut berbeda secara kimia. Karena
+              itu, nilainya ditampilkan terpisah, tidak dijumlahkan ataupun
+              dikonversi menjadi CO₂e. Satuan asli juga masih perlu
+              dikonfirmasi.
             </Explanation>
           </ChartCard>
         </section>
@@ -1038,13 +933,9 @@ export default function DataExplorer() {
                   {fuel.name} · {fuelYear}
                 </p>
 
-                <p className="mt-2 text-3xl font-black">
-                  {fmt(fuelValue, 0)}
-                </p>
+                <p className="mt-2 text-3xl font-black">{fmt(fuelValue, 0)}</p>
 
-                <p className="text-xs text-slate-500">
-                  kiloliter
-                </p>
+                <p className="text-xs text-slate-500">kiloliter</p>
 
                 <div className="mt-6 space-y-3">
                   {YEARS.map((year, index) => (
@@ -1066,12 +957,10 @@ export default function DataExplorer() {
             </div>
 
             <Explanation>
-              Pilih jenis BBM untuk membandingkan perubahan
-              dalam jenis yang sama. Nilai nol mengikuti
-              tabel sumber dan belum tentu membuktikan
-              tidak adanya konsumsi; status pencatatannya
-              perlu dipastikan. Tren konsumsi tidak otomatis
-              menjelaskan tren emisi tanpa faktor emisi
+              Pilih jenis BBM untuk membandingkan perubahan dalam jenis yang
+              sama. Nilai nol mengikuti tabel sumber dan belum tentu membuktikan
+              tidak adanya konsumsi; status pencatatannya perlu dipastikan. Tren
+              konsumsi tidak otomatis menjelaskan tren emisi tanpa faktor emisi
               dan batasan inventarisasi yang sesuai.
             </Explanation>
           </ChartCard>
@@ -1090,17 +979,12 @@ export default function DataExplorer() {
           />
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <ChartCard
-              title="Komposisi Moda"
-              subtitle="Provinsi Bali · 2024"
-            >
+            <ChartCard title="Komposisi Moda" subtitle="Provinsi Bali · 2024">
               <ModeDonut />
 
               <Explanation>
-                Dari setiap 100 bagian moda pada data
-                Bali 2024, sekitar 95,1 bagian berasal
-                dari motor dan mobil jika keduanya
-                digabungkan.
+                Dari setiap 100 bagian moda pada data Bali 2024, sekitar 95,1
+                bagian berasal dari motor dan mobil jika keduanya digabungkan.
               </Explanation>
             </ChartCard>
 
@@ -1108,18 +992,12 @@ export default function DataExplorer() {
               title="Rincian Moda"
               subtitle="Persentase dari seluruh kelompok moda"
             >
-              <ProgressBars
-                items={MODES}
-                max={100}
-                suffix="%"
-              />
+              <ProgressBars items={MODES} max={100} suffix="%" />
 
               <Explanation title="Apa implikasinya untuk TDM?">
-                Dominasi kendaraan pribadi menunjukkan
-                bahwa solusi tidak cukup berupa
-                penambahan jalan. Peningkatan daya
-                tarik angkutan umum, pengelolaan parkir,
-                dan akses ke halte menjadi kandidat
+                Dominasi kendaraan pribadi menunjukkan bahwa solusi tidak cukup
+                berupa penambahan jalan. Peningkatan daya tarik angkutan umum,
+                pengelolaan parkir, dan akses ke halte menjadi kandidat
                 kebijakan yang perlu diuji.
               </Explanation>
             </ChartCard>
@@ -1176,8 +1054,7 @@ export default function DataExplorer() {
                       ? 100
                       : Math.max(...TMD.map((x) => x.passengers));
 
-                  const selected =
-                    item.id === selectedCorridor;
+                  const selected = item.id === selectedCorridor;
 
                   return (
                     <button
@@ -1190,9 +1067,7 @@ export default function DataExplorer() {
                       }`}
                     >
                       <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-                        <span className="font-bold">
-                          Koridor {item.id}
-                        </span>
+                        <span className="font-bold">Koridor {item.id}</span>
 
                         <span className="font-black tabular-nums">
                           {fmt(value)}
@@ -1204,11 +1079,7 @@ export default function DataExplorer() {
                         <div
                           className="h-full rounded-full bg-red-700 transition-all"
                           style={{
-                            width: `${clamp(
-                              (value / maximum) * 100,
-                              0,
-                              100
-                            )}%`,
+                            width: `${clamp((value / maximum) * 100, 0, 100)}%`,
                           }}
                         />
                       </div>
@@ -1238,9 +1109,7 @@ export default function DataExplorer() {
                 </div>
 
                 <div className="rounded-2xl bg-slate-50 p-5">
-                  <p className="text-xs text-slate-500">
-                    Load Factor
-                  </p>
+                  <p className="text-xs text-slate-500">Load Factor</p>
 
                   <p className="mt-2 text-3xl font-black text-red-700">
                     {pct(corridor.lf)}
@@ -1263,13 +1132,10 @@ export default function DataExplorer() {
               </div>
 
               <Explanation>
-                Jumlah penumpang menunjukkan
-                penggunaan layanan selama periode
-                pencatatan. Load factor menunjukkan
-                tingkat keterisian menurut data
-                sumber. Keduanya tidak boleh
-                disamakan, dan load factor antarkoridor
-                tidak dijumlahkan.
+                Jumlah penumpang menunjukkan penggunaan layanan selama periode
+                pencatatan. Load factor menunjukkan tingkat keterisian menurut
+                data sumber. Keduanya tidak boleh disamakan, dan load factor
+                antarkoridor tidak dijumlahkan.
               </Explanation>
             </ChartCard>
           </div>
@@ -1291,21 +1157,14 @@ export default function DataExplorer() {
             title="Perbandingan antarwaktu pengamatan"
             subtitle="Jalan Waturenggong · 2022"
           >
-            <ProgressBars
-              items={ROAD_VOLUME}
-              color="#64748b"
-            />
+            <ProgressBars items={ROAD_VOLUME} color="#64748b" />
 
             <Explanation>
-              Batang yang lebih panjang berarti
-              nilai pengamatan lebih tinggi pada
-              interval tersebut. Ini adalah contoh
-              pengamatan satu ruas jalan, bukan
-              gambaran seluruh Denpasar. Penyebutan
-              periode 10 menit dan satuan volumenya
-              mengikuti dokumen sumber dan perlu
-              dipertahankan saat membandingkan
-              dengan data ruas lainnya.
+              Batang yang lebih panjang berarti nilai pengamatan lebih tinggi
+              pada interval tersebut. Ini adalah contoh pengamatan satu ruas
+              jalan, bukan gambaran seluruh Denpasar. Penyebutan periode 10
+              menit dan satuan volumenya mengikuti dokumen sumber dan perlu
+              dipertahankan saat membandingkan dengan data ruas lainnya.
             </Explanation>
           </ChartCard>
         </section>
@@ -1348,9 +1207,7 @@ export default function DataExplorer() {
               icon={CheckCircle2}
               label="Kesesuaian Total"
               value={
-                Math.abs(matrixSum - matTotal) < 0.01
-                  ? "Sesuai"
-                  : "Perlu cek"
+                Math.abs(matrixSum - matTotal) < 0.01 ? "Sesuai" : "Perlu cek"
               }
               unit="Total matriks vs nilai referensi"
             />
@@ -1365,9 +1222,7 @@ export default function DataExplorer() {
                 Zona Asal
                 <select
                   value={selectedOrigin}
-                  onChange={(e) =>
-                    setSelectedOrigin(Number(e.target.value))
-                  }
+                  onChange={(e) => setSelectedOrigin(Number(e.target.value))}
                   className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
                 >
                   {zoneNames.map((name, i) => (
@@ -1398,31 +1253,23 @@ export default function DataExplorer() {
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">
-                  Bangkitan Zona Asal
-                </p>
+                <p className="text-xs text-slate-500">Bangkitan Zona Asal</p>
 
                 <p className="mt-2 text-xl font-black">
                   {fmt(originTotals[selectedOrigin], 0)}
                 </p>
 
-                <p className="text-[11px] text-slate-500">
-                  smp/jam
-                </p>
+                <p className="text-[11px] text-slate-500">smp/jam</p>
               </div>
 
               <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">
-                  Tarikan Zona Tujuan
-                </p>
+                <p className="text-xs text-slate-500">Tarikan Zona Tujuan</p>
 
                 <p className="mt-2 text-xl font-black">
                   {fmt(destinationTotals[selectedDestination], 0)}
                 </p>
 
-                <p className="text-[11px] text-slate-500">
-                  smp/jam
-                </p>
+                <p className="text-[11px] text-slate-500">smp/jam</p>
               </div>
 
               <div className="rounded-xl bg-red-50 p-4">
@@ -1434,21 +1281,16 @@ export default function DataExplorer() {
                   {fmt(selectedOD, 0)}
                 </p>
 
-                <p className="text-[11px] text-red-700">
-                  smp/jam
-                </p>
+                <p className="text-[11px] text-red-700">smp/jam</p>
               </div>
             </div>
 
             <Explanation title="Apa arti angka OD ini?">
-              Pergerakan {zid(selectedOrigin)} ke{" "}
-              {zid(selectedDestination)} menyumbang{" "}
-              <strong>{pct(selectedShare)}</strong>{" "}
-              dari total MAT yang dihitung. Bangkitan
-              menjumlahkan seluruh perjalanan yang
-              berasal dari suatu zona, sedangkan
-              tarikan menjumlahkan seluruh perjalanan
-              yang menuju zona tersebut.
+              Pergerakan {zid(selectedOrigin)} ke {zid(selectedDestination)}{" "}
+              menyumbang <strong>{pct(selectedShare)}</strong> dari total MAT
+              yang dihitung. Bangkitan menjumlahkan seluruh perjalanan yang
+              berasal dari suatu zona, sedangkan tarikan menjumlahkan seluruh
+              perjalanan yang menuju zona tersebut.
             </Explanation>
           </ChartCard>
 
@@ -1467,14 +1309,10 @@ export default function DataExplorer() {
               </div>
 
               <button
-                onClick={() =>
-                  setShowMatrixValues((value) => !value)
-                }
+                onClick={() => setShowMatrixValues((value) => !value)}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold hover:bg-slate-50"
               >
-                {showMatrixValues
-                  ? "Sembunyikan angka"
-                  : "Tampilkan angka"}
+                {showMatrixValues ? "Sembunyikan angka" : "Tampilkan angka"}
               </button>
             </div>
 
@@ -1516,19 +1354,13 @@ export default function DataExplorer() {
 
                       {row.map((raw, j) => {
                         const value = Number(raw || 0);
-                        const intensity = Math.sqrt(
-                          value / maxCell
-                        );
+                        const intensity = Math.sqrt(value / maxCell);
 
                         const active =
-                          selectedOrigin === i &&
-                          selectedDestination === j;
+                          selectedOrigin === i && selectedDestination === j;
 
                         return (
-                          <td
-                            key={j}
-                            className="border border-white p-[2px]"
-                          >
+                          <td key={j} className="border border-white p-[2px]">
                             <button
                               onClick={() => {
                                 setSelectedOrigin(i);
@@ -1542,12 +1374,8 @@ export default function DataExplorer() {
                                   : "hover:ring-2 hover:ring-inset hover:ring-red-500"
                               }`}
                               style={{
-                                backgroundColor:
-                                  `rgba(185,28,28,${0.07 + intensity * 0.86})`,
-                                color:
-                                  intensity > 0.68
-                                    ? "white"
-                                    : "#334155",
+                                backgroundColor: `rgba(185,28,28,${0.07 + intensity * 0.86})`,
+                                color: intensity > 0.68 ? "white" : "#334155",
                               }}
                             >
                               {showMatrixValues
@@ -1574,21 +1402,19 @@ export default function DataExplorer() {
                 <span>Tinggi</span>
               </div>
 
-              <span className="flex items-center gap-1">
+              {/* <span className="flex items-center gap-1">
                 <MousePointerClick size={14} />
                 Pilih sel
-              </span>
+              </span> */}
             </div>
           </div>
 
-          <Explanation>
-            Setiap baris adalah zona asal dan setiap
-            kolom adalah zona tujuan. Warna menunjukkan
-            besar nilai relatif terhadap sel terbesar
-            dalam matriks, bukan tingkat kemacetan
-            ruas jalan. Matriks juga bukan peta lokasi
-            geografis.
-          </Explanation>
+          {/* <Explanation>
+            Setiap baris adalah zona asal dan setiap kolom adalah zona tujuan.
+            Warna menunjukkan besar nilai relatif terhadap sel terbesar dalam
+            matriks, bukan tingkat kemacetan ruas jalan. Matriks juga bukan peta
+            lokasi geografis.
+          </Explanation> */}
 
           {/* TOP OD */}
 
@@ -1633,9 +1459,7 @@ export default function DataExplorer() {
                       {fmt(pair.value, 0)}
                     </p>
 
-                    <p className="text-[11px] text-slate-400">
-                      smp/jam
-                    </p>
+                    <p className="text-[11px] text-slate-400">smp/jam</p>
                   </div>
                 </button>
               ))}
@@ -1657,22 +1481,16 @@ export default function DataExplorer() {
 
           <div className="grid gap-5 rounded-2xl border border-slate-200 p-4 sm:rounded-3xl sm:p-7 lg:grid-cols-2">
             <div>
-              <p className="text-sm font-bold">
-                Asumsi Penurunan Emisi
-              </p>
+              <p className="text-sm font-bold">Asumsi Penurunan Emisi</p>
 
               <p className="mt-2 text-xs leading-6 text-slate-500">
-                Geser parameter di bawah ini.
-                Ini bukan hasil pengukuran lapangan,
-                tetapi ilustrasi hubungan matematis
-                antara perubahan persentase dan
-                angka acuan inventarisasi GRK.
+                Geser parameter di bawah ini. Ini bukan hasil pengukuran
+                lapangan, tetapi ilustrasi hubungan matematis antara perubahan
+                persentase dan angka acuan inventarisasi GRK.
               </p>
 
               <div className="mt-7 flex items-end justify-between">
-                <span className="text-xs text-slate-500">
-                  Besaran asumsi
-                </span>
+                <span className="text-xs text-slate-500">Besaran asumsi</span>
 
                 <span className="text-4xl font-black text-red-700">
                   {reduction}%
@@ -1685,9 +1503,7 @@ export default function DataExplorer() {
                 max="40"
                 step="1"
                 value={reduction}
-                onChange={(e) =>
-                  setReduction(Number(e.target.value))
-                }
+                onChange={(e) => setReduction(Number(e.target.value))}
                 className="mt-4 w-full accent-red-700"
               />
 
@@ -1714,11 +1530,9 @@ export default function DataExplorer() {
               </div>
 
               <Explanation title="Kebijakan yang bisa diuji">
-                Manajemen parkir, prioritas bus,
-                restrukturisasi trayek, integrasi
-                feeder TMD, dan pengaturan jam puncak.
-                Pengaruh masing-masing kebijakan
-                belum dihitung oleh slider ini.
+                Manajemen parkir, prioritas bus, restrukturisasi trayek,
+                integrasi feeder TMD, dan pengaturan jam puncak. Pengaruh
+                masing-masing kebijakan belum dihitung oleh slider ini.
               </Explanation>
             </div>
 
@@ -1758,13 +1572,9 @@ export default function DataExplorer() {
 
               <div className="mt-8 grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-white p-4">
-                  <p className="text-xs text-slate-500">
-                    Angka acuan GRK 2024
-                  </p>
+                  <p className="text-xs text-slate-500">Angka acuan GRK 2024</p>
 
-                  <p className="mt-2 text-2xl font-black">
-                    {fmt(grk2024)}
-                  </p>
+                  <p className="mt-2 text-2xl font-black">{fmt(grk2024)}</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-4">
@@ -1779,11 +1589,10 @@ export default function DataExplorer() {
               </div>
 
               <p className="mt-5 text-xs leading-6 text-slate-500">
-                Rumus: {fmt(grk2024)} × (1 − {reduction}/100)
-                = <strong>{fmt(scenarioGRK)}</strong>.
-                Selisihnya{" "}
-                <strong>{fmt(grk2024 - scenarioGRK)}</strong>{" "}
-                dalam satuan angka tabel sumber.
+                Rumus: {fmt(grk2024)} × (1 − {reduction}/100) ={" "}
+                <strong>{fmt(scenarioGRK)}</strong>. Selisihnya{" "}
+                <strong>{fmt(grk2024 - scenarioGRK)}</strong> dalam satuan angka
+                tabel sumber.
               </p>
             </div>
           </div>
@@ -1793,10 +1602,7 @@ export default function DataExplorer() {
 
         <section className="rounded-2xl border border-slate-200 p-5 sm:rounded-3xl sm:p-7">
           <div className="flex items-start gap-3">
-            <Info
-              size={20}
-              className="mt-1 shrink-0 text-red-700"
-            />
+            <Info size={20} className="mt-1 shrink-0 text-red-700" />
 
             <div>
               <h3 className="text-base font-bold">
@@ -1804,38 +1610,29 @@ export default function DataExplorer() {
               </h3>
 
               <p className="mt-3 text-xs leading-7 text-slate-600">
-                Dashboard menggabungkan beberapa
-                periode dan wilayah: emisi serta
-                BBM historis 2019–2024, mode share
-                Bali 2024, MAT Denpasar 2026,
-                dan penumpang TMD Juni 2026.
-                Masing-masing memiliki cakupan
-                dan satuan yang berbeda.
+                Dashboard menggabungkan beberapa periode dan wilayah: emisi
+                serta BBM historis 2019–2024, mode share Bali 2024, MAT Denpasar
+                2026, dan penumpang TMD Juni 2026. Masing-masing memiliki
+                cakupan dan satuan yang berbeda.
               </p>
 
               <p className="mt-3 text-xs leading-7 text-slate-600">
-                Total MAT dinyatakan dalam smp/jam,
-                bukan otomatis jumlah kendaraan,
-                penumpang, atau kilometer perjalanan.
-                Angka emisi belum dikonversi menjadi
-                ton CO₂e karena satuan dan label
+                Total MAT dinyatakan dalam smp/jam, bukan otomatis jumlah
+                kendaraan, penumpang, atau kilometer perjalanan. Angka emisi
+                belum dikonversi menjadi ton CO₂e karena satuan dan label
                 beberapa gas masih perlu diverifikasi.
               </p>
 
               <p className="mt-3 text-xs leading-7 text-slate-600">
-                Gambar RTRW dan pola ruang dapat
-                digunakan sebagai referensi konteks
-                tata ruang, tetapi tidak boleh
-                langsung diperlakukan sebagai data
-                GIS terukur tanpa georeferensi.
-                Hasil slider TDM merupakan skenario
-                sensitivitas, bukan prediksi emisi
-                yang telah dikalibrasi.
+                Gambar RTRW dan pola ruang dapat digunakan sebagai referensi
+                konteks tata ruang, tetapi tidak boleh langsung diperlakukan
+                sebagai data GIS terukur tanpa georeferensi. Hasil slider TDM
+                merupakan skenario sensitivitas, bukan prediksi emisi yang telah
+                dikalibrasi.
               </p>
             </div>
           </div>
         </section>
-
       </div>
     </main>
   );

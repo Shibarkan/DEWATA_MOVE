@@ -118,7 +118,7 @@ export default function Home({ onNavigate }) {
             </div>
           </div>
 
-          {/* RIGHT — STUDY SUMMARY */}
+          {/* RIGHT - STUDY SUMMARY */}
           <div className="hero-enter hero-delay-3">
             <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-[#FAFAFA]">
 
@@ -128,7 +128,7 @@ export default function Home({ onNavigate }) {
                 </p>
 
                 <span className="text-xs text-slate-400">
-                  2026—2041
+                  2026-2041
                 </span>
               </div>
 
@@ -380,7 +380,7 @@ export default function Home({ onNavigate }) {
                 </p>
 
                 <p className="mt-auto pt-8 text-xs font-medium text-slate-400">
-                  Kerangka model — pengembangan
+                  Kerangka model - pengembangan
                 </p>
               </button>
             </Reveal>
@@ -413,7 +413,7 @@ export default function Home({ onNavigate }) {
                 </p>
 
                 <p className="mt-auto pt-8 text-xs font-medium text-[#B91C1C]">
-                  Kerangka model — pengembangan
+                  Kerangka model - pengembangan
                 </p>
               </button>
             </Reveal>

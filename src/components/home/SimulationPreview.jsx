@@ -19,7 +19,7 @@ import {
 import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
 
 /*
- * DENPASAR 2041 — SMOOTH TRAFFIC PREVIEW
+ * DENPASAR 2041 - SMOOTH TRAFFIC PREVIEW
  *
  * Khusus halaman Beranda.
  *
@@ -980,12 +980,12 @@ export default function SimulationPreview({
             [zone.lat, zone.lng],
             {
               icon: createZoneIcon(zone.id, false),
-              title: `${zone.id} — ${zone.name}`,
+              title: `${zone.id} - ${zone.name}`,
             }
           ).addTo(map);
 
           marker.bindTooltip(
-            `${zone.id} — ${zone.name}`
+            `${zone.id} - ${zone.name}`
           );
 
           marker.on("click", () => {
@@ -1472,7 +1472,7 @@ export default function SimulationPreview({
             >
               {zones.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.id} — {z.name}
+                  {z.id} - {z.name}
                 </option>
               ))}
             </select>
@@ -1490,7 +1490,7 @@ export default function SimulationPreview({
             >
               {zones.map((z) => (
                 <option key={z.id} value={z.id}>
-                  {z.id} — {z.name}
+                  {z.id} - {z.name}
                 </option>
               ))}
             </select>
@@ -1504,7 +1504,7 @@ export default function SimulationPreview({
 
           <p className="text-xs font-bold text-slate-600">
             {scenario === "after"
-              ? "MAT SETELAH TDM — ASUMSI"
+              ? "MAT SETELAH TDM - ASUMSI"
               : "TOTAL MAT 2026"}
           </p>
 
@@ -1515,7 +1515,7 @@ export default function SimulationPreview({
                     ? afterTotal
                     : network.metadata.matTotal
                 )
-              : "—"}
+              : "-"}
 
             <span className="ml-2 text-xs font-normal">
               smp/jam
@@ -1528,7 +1528,7 @@ export default function SimulationPreview({
 
           <p className="mt-1 text-lg font-black text-slate-900">
             {shownOD == null
-              ? "—"
+              ? "-"
               : formatNumber(shownOD)}
 
             <span className="text-xs font-normal">
