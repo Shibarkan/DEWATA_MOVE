@@ -1,9 +1,13 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Toaster, toast } from "sonner";
 import ModelMap from "../components/modeling/ModelMap";
-import { getDenpasarNetwork } from "../data/denpasarNetworkBrowser";
+import { getDenpasarNetwork } from "../data/denpasarNetworkModeling";
 import { MODEL_ZONES } from "../data/modelEngine";
 import { POLICY_SCENARIOS, createPolicyModel, normalizePolicy } from "../data/policyEngine";
 import { assignTraffic } from "../data/trafficAssignment";
+
+
 
 /**
  * DEWATAMOVE 2041 — Modeling Studio / Traffic Maps
@@ -46,35 +50,58 @@ function initialPolicy() {
   }
 }
 function IntroLoading({ onComplete }) {
+  const reduceMotion = useReducedMotion();
   const [progress, setProgress] = useState(0);
+
   useEffect(() => {
-    setProgress(0);
+    let frameId;
     const start = performance.now();
-    let raf = 0;
+    const duration = reduceMotion ? 420 : 1450;
     const tick = (now) => {
-      const ratio = Math.min(1, (now - start) / 1400);
+      const ratio = Math.min(1, (now - start) / duration);
       setProgress(Math.round(ratio * 100));
-      if (ratio < 1) raf = requestAnimationFrame(tick);
+      if (ratio < 1) frameId = requestAnimationFrame(tick);
       else onComplete();
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [onComplete]);
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [onComplete, reduceMotion]);
+
   return (
-    <div className="fixed inset-0 z-[7000] grid place-items-center bg-[#FCFBF9] px-5" role="status" aria-label="Memuat halaman modeling">
-      <div className="w-full max-w-[720px] text-center">
-        <h2 className="select-none text-[clamp(3.1rem,11vw,8rem)] font-black leading-none tracking-[-0.07em] text-[#B91C1C] motion-safe:animate-pulse">
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={reduceMotion ? {} : { opacity: 0, transition: { duration: 0.22 } }}
+      className="fixed inset-0 z-[7500] grid place-items-center bg-[#FFFEFD] px-5"
+      role="status" aria-label="Memuat halaman modeling"
+    >
+      <div className="w-full max-w-3xl text-center">
+        <motion.h2
+          initial={reduceMotion ? false : { opacity: 0, y: 20, letterSpacing: "-0.10em" }}
+          animate={{ opacity: 1, y: 0, letterSpacing: "-0.065em" }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          className="select-none text-[clamp(3.2rem,11vw,8.5rem)] font-black leading-none text-[#B91C1C]"
+        >
           MODELING
-        </h2>
-        <div className="mx-auto mt-9 h-[3px] w-full max-w-[290px] overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-[#B91C1C]" style={{ width: `${progress}%` }} />
+        </motion.h2>
+        <div className="mx-auto mt-9 h-[3px] w-full max-w-[290px] overflow-hidden rounded-full bg-slate-100">
+          <motion.div
+            className="h-full rounded-full bg-[#B91C1C]"
+            initial={{ width: "0%" }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.08, ease: "linear" }}
+          />
         </div>
-        <p className="mt-3 text-[11px] font-semibold tracking-[0.2em] tabular-nums text-slate-400">{progress}%</p>
-        <button type="button" onClick={onComplete} className="mt-6 text-xs font-medium text-slate-400 underline-offset-4 hover:text-[#B91C1C] hover:underline">Lewati</button>
+        <p className="mt-3 text-[11px] font-semibold tracking-[0.14em] tabular-nums text-slate-400">{progress}%</p>
+        <button type="button" onClick={onComplete}
+          className="mt-6 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 transition-colors hover:text-[#B91C1C] focus-visible:outline-2 focus-visible:outline-[#B91C1C]">
+          Skip
+        </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
+
 function Headline({ stage }) {
   const title = STAGES.find((x) => x.id === stage)?.title || "SEBELUM";
   return (
@@ -335,90 +362,145 @@ function waitPaint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function ProcessingScreen({ phase, graphAvailable }) {
+/** Modal modern memakai Motion; teks fase bergerak halus, bukan panel langkah bertumpuk. */
+function ProcessingModal({ phase, graphAvailable }) {
   const dialogRef = useRef(null);
+  const reduceMotion = useReducedMotion();
   const phases = ANALYSIS_STEPS.map((step, index) =>
     index === 2 && !graphAvailable
-      ? { ...step, detail: "Menyiapkan hasil MAT; jaringan koridor belum tersedia." }
+      ? { ...step, detail: "Matriks siap; jaringan jalan sampel belum tersedia." }
       : step
   );
-  const currentIndex = Math.max(0, Math.min(phase, phases.length - 1));
-  const current = phases[currentIndex];
+  const index = Math.max(0, Math.min(phase, phases.length - 1));
+  const current = phases[index];
+  const progress = ((index + 1) / phases.length) * 100;
 
   useEffect(() => {
-    // Modal proses tidak bisa ditutup sebelum kalkulasi selesai.
-    // Kunci scroll, dan tempatkan fokus keyboard pada dialog.
-    const previous = document.body.style.overflow;
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
-    return () => { document.body.style.overflow = previous; };
+    return () => { document.body.style.overflow = originalOverflow; };
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[8200] flex items-center justify-center bg-slate-400/20 px-4 py-6 backdrop-blur-[2px]">
-      <div
+    <motion.div
+      key="model-processing-overlay"
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={reduceMotion ? {} : { opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[8400] flex items-center justify-center bg-slate-950/15 px-4 py-5 backdrop-blur-[3px]"
+    >
+      <motion.section
         ref={dialogRef}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dm-process-title"
-        aria-describedby="dm-process-description"
-        className="max-h-[calc(100dvh-48px)] w-full max-w-[450px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_25px_75px_rgba(15,23,42,0.18)] outline-none sm:p-8"
+        aria-describedby="dm-process-desc"
+        onKeyDown={(event) => {
+          if (event.key === "Tab") {
+            event.preventDefault();
+            dialogRef.current?.focus();
+          }
+        }}
+        initial={reduceMotion ? false : { opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={reduceMotion ? {} : { opacity: 0, y: 12, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 330, damping: 29 }}
+        className="relative w-full max-w-[480px] overflow-hidden rounded-[24px] border border-slate-200/90 bg-white px-6 pb-7 pt-8 shadow-[0_24px_100px_rgba(15,23,42,.13)] outline-none sm:px-9 sm:pb-9 sm:pt-10"
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="mb-8 flex items-center justify-between gap-4">
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#B91C1C]">DEWATAMOVE 2041</span>
-          <span className="text-[11px] font-semibold tabular-nums text-slate-400">{currentIndex + 1} / {phases.length}</span>
+          <div className="flex items-center gap-1.5" aria-hidden="true">
+            {phases.map((_, i) => (
+              <motion.span key={i}
+                animate={{ backgroundColor: i <= index ? "#B91C1C" : "#E2E8F0", width: i === index ? 22 : 6 }}
+                transition={{ duration: 0.32 }}
+                className="h-1.5 rounded-full"
+              />
+            ))}
+          </div>
         </div>
-        <h2 id="dm-process-title" className="mt-3 text-[23px] font-bold tracking-tight text-slate-900 sm:text-[27px]">Memproses skenario</h2>
-        <p id="dm-process-description" className="mt-2 text-[12px] leading-6 text-slate-500">Perhitungan berlangsung. Hasil akan ditampilkan otomatis setelah selesai.</p>
 
-        <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-[#B91C1C] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${((currentIndex + 1) / phases.length) * 100}%` }} />
+        <div className="relative mb-8 flex h-20 items-center justify-center" aria-hidden="true">
+          <motion.div
+            className="absolute h-[74px] w-[74px] rounded-full border border-[#B91C1C]/15"
+            animate={reduceMotion ? {} : { scale: [0.95, 1.16, 0.95], opacity: [0.7, 0.25, 0.7] }}
+            transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="h-[48px] w-[48px] rounded-full border-[3px] border-[#FCE8E8] border-t-[#B91C1C]"
+            animate={reduceMotion ? {} : { rotate: 360 }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
+          />
         </div>
 
-        <div className="mt-6 space-y-1" aria-live="polite" aria-atomic="true">
-          {phases.map((step, index) => {
-            const finished = index < currentIndex;
-            const active = index === currentIndex;
-            return (
-              <div key={step.title} className={`flex items-center gap-3 rounded-lg px-2 py-2.5 text-[12px] transition-colors ${active ? "bg-[#FFF4F4] text-[#991B1B]" : finished ? "text-slate-600" : "text-slate-400"}`}>
-                <span aria-hidden="true" className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-bold ${finished ? "border-[#0F766E] bg-[#0F766E] text-white" : active ? "border-[#B91C1C] text-[#B91C1C]" : "border-slate-200"}`}>
-                  {finished ? "✓" : active ? <span className="h-2 w-2 rounded-full bg-[#B91C1C] motion-safe:animate-pulse" /> : null}
-                </span>
-                <span className={active ? "font-semibold" : "font-medium"}>{step.title}</span>
-              </div>
-            );
-          })}
+        <h2 id="dm-process-title" className="text-center text-[23px] font-bold tracking-[-0.045em] text-slate-900 sm:text-[28px]">
+          Memproses skenario
+        </h2>
+        <div className="mt-4 min-h-[86px]">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={index}
+              initial={reduceMotion ? false : { opacity: 0, y: 10, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={reduceMotion ? {} : { opacity: 0, y: -8, filter: "blur(4px)" }}
+              transition={{ duration: 0.26, ease: "easeOut" }}
+              className="text-center"
+              aria-live="polite"
+            >
+              <p id="dm-process-desc" className="text-[14px] font-semibold text-slate-800">{current.title}</p>
+              <p className="mt-1.5 text-[12px] leading-6 text-slate-500">{current.detail}</p>
+            </motion.div>
+          </AnimatePresence>
         </div>
-        <p className="mt-4 text-[11px] leading-5 text-slate-500">{current.detail}</p>
-      </div>
-    </div>
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100" aria-label="Progres perhitungan">
+          <motion.div
+            className="h-full rounded-full bg-[#B91C1C]"
+            initial={{ width: "6%" }}
+            animate={{ width: `${progress}%` }}
+            transition={{ type: "spring", stiffness: 105, damping: 21 }}
+          />
+        </div>
+        <p className="mt-3 text-center text-[10px] leading-5 text-slate-400">Model MAT dan pembebanan jaringan sampel</p>
+      </motion.section>
+    </motion.div>
   );
 }
 
-function ToastNotice({ notice, onDismiss, onNavigate }) {
-  if (!notice) return null;
-  const isSuccess = notice.type === "success";
-  const isWarning = notice.type === "warning";
-  const accent = isSuccess ? "border-l-[#0F766E]" : isWarning ? "border-l-[#D97706]" : "border-l-[#B91C1C]";
-  const textColor = isSuccess ? "text-[#0F766E]" : isWarning ? "text-[#92400E]" : "text-[#B91C1C]";
+/** Empty state yang SELALU terlihat ketika belum ada kebijakan diterapkan. */
+function EmptyResults({ stage, onNavigate }) {
+  const reduceMotion = useReducedMotion();
+  const after = stage === "after";
   return (
-    <div className="pointer-events-none fixed inset-x-3 top-20 z-[9000] flex justify-end sm:inset-x-auto sm:right-5 sm:top-24" aria-live="polite">
-      <div role={isSuccess ? "status" : "alert"} className={`pointer-events-auto w-full max-w-[390px] rounded-xl border border-l-[4px] border-slate-200 bg-white px-4 py-3.5 shadow-[0_12px_36px_rgba(15,23,42,0.13)] ${accent}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className={`text-[13px] font-bold leading-5 ${textColor}`}>{notice.title}</p>
-            {notice.message && <p className="mt-1 text-[12px] leading-5 text-slate-600">{notice.message}</p>}
-          </div>
-          <button type="button" aria-label="Tutup notifikasi" onClick={onDismiss} className="-mr-1 -mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">×</button>
-        </div>
-        {notice.actionPage && (
-          <button type="button" onClick={() => { onDismiss(); onNavigate?.(notice.actionPage); }} className={`mt-2.5 text-[12px] font-semibold underline-offset-4 hover:underline ${textColor}`}>
-            {notice.actionLabel || "Lanjut"} →
-          </button>
-        )}
-      </div>
-    </div>
+    <motion.section
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="mx-auto flex min-h-[420px] max-w-[760px] flex-col items-center justify-center py-16 text-center sm:min-h-[510px]"
+      aria-labelledby="dm-empty-title"
+    >
+      <span className="rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-[11px] font-semibold text-amber-800">Hasil belum tersedia</span>
+      <h2 id="dm-empty-title" className="mt-6 max-w-[600px] text-[clamp(1.65rem,4.5vw,2.65rem)] font-bold leading-tight tracking-[-0.05em] text-slate-900">
+        Kebijakan belum diterapkan.
+      </h2>
+      <p className="mt-4 max-w-lg text-[13px] leading-7 text-slate-500 sm:text-[14px]">
+        {after
+          ? "Untuk melihat kondisi Sesudah, atur parameter kebijakan TDM terlebih dahulu dan jalankan skenarionya pada halaman Proses."
+          : "Belum ada hasil yang dapat dibandingkan. Jalankan skenario melalui halaman Proses untuk menampilkan analisis Sebelum dan Sesudah."}
+      </p>
+      <motion.button
+        type="button"
+        whileHover={reduceMotion ? {} : { y: -2 }}
+        whileTap={reduceMotion ? {} : { scale: 0.98 }}
+        onClick={() => onNavigate?.("process")}
+        className="mt-7 rounded-full bg-[#B91C1C] px-7 py-3.5 text-[13px] font-bold text-white shadow-[0_7px_19px_rgba(185,28,28,.13)] transition-colors hover:bg-[#991B1B] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#B91C1C]"
+      >
+        Atur kebijakan
+      </motion.button>
+      <p className="mt-5 text-[11px] text-slate-400">Hasil akan tampil setelah perhitungan berhasil.</p>
+    </motion.section>
   );
 }
 
@@ -433,7 +515,6 @@ export default function ModelOverview({ type = "before", onNavigate }) {
   const [applied, setApplied] = useState(() => readCompletedRun()?.policy || normalizePolicy(POLICY_SCENARIOS.integrated));
   const [draft, setDraft] = useState(() => readCompletedRun()?.policy || initialPolicy());
   const [runPhase, setRunPhase] = useState(null);
-  const [notice, setNotice] = useState(null);
   const runningRef = useRef(false);
 
   const deferredDraft = useDeferredValue(draft);
@@ -444,31 +525,20 @@ export default function ModelOverview({ type = "before", onNavigate }) {
   const [error, setError] = useState("");
   const [details, setDetails] = useState(false);
 
-  const notify = useCallback((payload) => setNotice({ ...payload }), []);
-
-  // Toast hilang otomatis. Pergantian notifikasi me-reset waktunya.
-  useEffect(() => {
-    if (!notice) return undefined;
-    const timer = window.setTimeout(() => setNotice((current) => current === notice ? null : current), 6000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  // Saat halaman Sesudah/Perbandingan dibuka sebelum ada run,
-  // tampilkan alert kecil, bukan panel kosong permanen.
+  // Notifikasi memakai Sonner, tidak ada lagi banner/alert custom.
   useEffect(() => {
     if (intro) return;
     if ((stage === "after" || stage === "comparison") && !ready) {
-      notify({
-        type: "warning",
-        title: "Skenario belum diterapkan",
-        message: "Jalankan skenario pada halaman Proses untuk melihat hasil.",
-        actionPage: "process",
-        actionLabel: "Atur kebijakan",
+      toast.warning("Kebijakan belum diterapkan", {
+        id: "dm-no-scenario", duration: 4500,
+        description: "Atur kebijakan di halaman Proses terlebih dahulu.",
+        action: { label: "Atur kebijakan", onClick: () => onNavigate?.("process") },
+        actionButtonStyle: { backgroundColor: "#B91C1C", color: "#FFFFFF" },
       });
-    } else if (stage === "before" || stage === "process") {
-      setNotice((current) => current?.type === "warning" ? null : current);
+    } else {
+      toast.dismiss("dm-no-scenario");
     }
-  }, [stage, intro, ready, notify]);
+  }, [stage, intro, ready]);
 
   const updateView = useCallback((next) => setView((prev) => (
     Math.abs(prev.lat - next.lat) < 0.000008 && Math.abs(prev.lng - next.lng) < 0.000008 && Math.abs(prev.zoom - next.zoom) < 0.05 ? prev : next
@@ -496,7 +566,7 @@ export default function ModelOverview({ type = "before", onNavigate }) {
   async function apply() {
     if (runningRef.current) return;
     runningRef.current = true;
-    setNotice(null);
+    toast.dismiss("dm-no-scenario");
     setRunPhase(0);
     const next = normalizePolicy(draft);
     try {
@@ -539,20 +609,19 @@ export default function ModelOverview({ type = "before", onNavigate }) {
       setApplied(next);
       setRunInfo(completed);
       setRunPhase(null);
-      notify({
-        type: "success",
-        title: "Skenario berhasil diterapkan",
-        message: "Hasil Sesudah sudah tersedia.",
-        actionPage: "comparison",
-        actionLabel: "Lihat perbandingan",
-      });
       onNavigate?.("after");
+      toast.success("Skenario berhasil diterapkan", {
+        id: "dm-applied-success",
+        description: "Hasil Sesudah telah tersedia.",
+        duration: 6500,
+        action: { label: "Lihat perbandingan", onClick: () => onNavigate?.("comparison") },
+        actionButtonStyle: { backgroundColor: "#B91C1C", color: "#FFFFFF" },
+      });
     } catch (cause) {
       setRunPhase(null);
-      notify({
-        type: "error",
-        title: "Skenario gagal diterapkan",
-        message: cause?.message || "Perhitungan gagal. Silakan coba lagi.",
+      toast.error("Skenario gagal diterapkan", {
+        description: cause?.message || "Perhitungan gagal. Silakan coba lagi.",
+        duration: 6500,
       });
     } finally {
       runningRef.current = false;
@@ -561,9 +630,24 @@ export default function ModelOverview({ type = "before", onNavigate }) {
 
   return (
     <>
-      {intro && <IntroLoading onComplete={closeIntro} />}
-      {runPhase !== null && <ProcessingScreen phase={runPhase} graphAvailable={Boolean(graph)} />}
-      {runPhase === null && <ToastNotice notice={notice} onDismiss={() => setNotice(null)} onNavigate={onNavigate} />}
+      <Toaster
+        theme="light"
+        position="top-right"
+        closeButton
+        richColors={false}
+        visibleToasts={2}
+        offset={{ top: "94px", right: "16px" }}
+        mobileOffset={{ top: "80px", right: "12px", left: "12px" }}
+        toastOptions={{
+          className: "!rounded-2xl !border !border-slate-200 !bg-white !text-slate-900 !shadow-[0_18px_45px_rgba(15,23,42,.12)]",
+        }}
+      />
+      <AnimatePresence>
+        {intro && <IntroLoading key="dm-intro" onComplete={closeIntro} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {runPhase !== null && <ProcessingModal key="dm-process" phase={runPhase} graphAvailable={Boolean(graph)} />}
+      </AnimatePresence>
 
       <main className="min-h-screen bg-white text-slate-900">
         <Headline stage={stage} />
@@ -571,7 +655,7 @@ export default function ModelOverview({ type = "before", onNavigate }) {
 
         <div className="mx-auto max-w-[1460px] px-4 pb-20 pt-9 sm:px-7 sm:pt-12 lg:px-10">
           {(stage === "after" || stage === "comparison") && !ready ? (
-            <div className="min-h-[320px]" aria-label="Hasil simulasi belum tersedia" />
+            <EmptyResults stage={stage} onNavigate={onNavigate} />
           ) : (
             <>
               {stage === "comparison" && (

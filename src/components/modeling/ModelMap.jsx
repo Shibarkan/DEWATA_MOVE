@@ -50,30 +50,37 @@ function pressureColor(relative) {
   return TEAL;
 }
 function createRoads(assignment, graph, model) {
-  const routed = (assignment?.roads || []).filter((r) => r.before > 0 && r.a && r.b && r.length > 2);
-  if (routed.length >= 20 && assignment.coverage > 0.03) {
-    return {
-      mode: "assigned",
-      roads: routed.slice(0, 1700).map((r) => ({ ...r, key: String(r.id) })),
-    };
+  // Kunci utama: jalan sumber dan kendaraan harus memakai geometri yang SAMA.
+  // Network v2 hanya berisi OSRM step dengan mode "driving". Untuk v1,
+  // jangan menggambar mobil agar tidak ada mobil di ferry/perairan.
+  if (!graph?.nodes?.length || !graph?.edges?.length) {
+    return { mode: "unavailable", roads: [] };
   }
-  // Fallback dari graph koridor asli yang dimuat OSRM; bobot tekanan ilustratif
-  // dari penyedia graph. Setelah kebijakan: dikalikan rasio MAT hasil model.
-  if (graph?.nodes?.length && graph?.edges?.length) {
-    const growth = (model?.beforeTotal || 1) / Math.max(1, model?.base2026 || 1);
-    const ratio = (model?.afterTotal || 1) / Math.max(1, model?.beforeTotal || 1);
-    return {
-      mode: "proxy",
-      roads: graph.edges.map((edge, i) => {
-        const before = Math.max(0, Number(edge[4]) || 0) * growth;
-        return {
-          id: i, key: String(i), a: graph.nodes[edge[0]], b: graph.nodes[edge[1]],
-          length: Number(edge[2]) || 0, before, after: before * ratio,
-        };
-      }).filter((r) => r.a && r.b && r.length > 2 && r.before > 0).slice(0, 1700),
-    };
+  if (graph.metadata?.ferryFiltered !== true) {
+    return { mode: "outdated", roads: [] };
   }
-  return { mode: "unavailable", roads: [] };
+  const valid = (p) => Array.isArray(p) && p.length === 2 &&
+    Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
+    p[0] > -8.85 && p[0] < -8.53 && p[1] > 115.08 && p[1] < 115.45;
+  const assigned = new Map((assignment?.roads || []).map((r) => [r.id, r]));
+  const hasAssignment = assigned.size >= 20 && assignment.coverage > 0.03;
+  const growth = (model?.beforeTotal || 1) / Math.max(1, model?.base2026 || 1);
+  const policyRatio = (model?.afterTotal || 1) / Math.max(1, model?.beforeTotal || 1);
+  const roads = [];
+  graph.edges.forEach((edge, i) => {
+    const a = graph.nodes[edge[0]], b = graph.nodes[edge[1]];
+    if (!valid(a) || !valid(b)) return;
+    const length = Number(edge[2]) || 0;
+    // Long-gap / invalid links are not converted to artificial straight roads.
+    if (length < 1 || length > 1500) return;
+    const matched = hasAssignment ? assigned.get(i) : null;
+    const base = Math.max(0, Number(edge[4]) || 0) * growth;
+    const before = hasAssignment ? Math.max(0, matched?.before || 0) : base;
+    const after = hasAssignment ? Math.max(0, matched?.after || 0) : base * policyRatio;
+    if (!before) return;
+    roads.push({ id: i, key: String(i), a, b, length, before, after });
+  });
+  return { mode: hasAssignment ? "assigned" : "proxy", roads };
 }
 function buildVehiclePopulation(roads, previousCars) {
   if (!roads.length) return [];
@@ -278,11 +285,12 @@ export default function ModelMap({
           interactive: false,
         }).addTo(group);
       }
-    } else {
-      // Garis ini adalah OD centroid-to-centroid, BUKAN geometri jalan.
+    } else if (layer === "od") {
+      // HANYA ditampilkan ketika tombol OD diklik secara eksplisit.
+      // Garis ini bukan jalan dan tidak dipakai untuk animasi mobil.
       for (const p of (model?.pairs || []).slice(0, 22)) {
         L.polyline([[p.origin.lat, p.origin.lng], [p.destination.lat, p.destination.lng]], {
-          color: p.origin.id === selectedZone ? RED : "#94A3B8",
+          color: p.origin.id === selectedZone ? RED : "#64748B",
           weight: p.origin.id === selectedZone ? 2.4 : 1.2,
           opacity: p.origin.id === selectedZone ? 0.8 : 0.34,
           dashArray: "5 8", interactive: false,
@@ -327,7 +335,9 @@ export default function ModelMap({
       const projected = new Map();
       const zoom = map.getZoom();
       const vehicleScale = clamp((zoom - 12.0) / 5.1, 0.14, 1.15);
-      const laneOffset = zoom < 14 ? 0 : clamp((zoom - 13) * 1.35, 0, 7);
+      // OSRM centerline sama dengan peta dasar. Jangan geser kendaraan keluar
+      // garis jalan saat zoom jauh. Offset kiri hanya pada zoom sangat dekat.
+      const laneOffset = zoom < 17 ? 0 : clamp((zoom - 16) * 1.4, 0, 4.2);
       for (const list of occupied.values()) {
         for (let i = 0; i < list.length; i++) {
           const car = list[i];
@@ -437,15 +447,22 @@ export default function ModelMap({
           {playing ? <Pause size={13} /> : <Play size={13} />}{playing ? "Jeda" : "Putar"}
         </button>
         <span className="hidden rounded-lg bg-white/95 px-3 py-2 text-[10px] font-medium text-slate-500 shadow-sm sm:inline-block">
-          {mode === "assigned" ? "Pembebanan ruas sampel" : mode === "proxy" ? "Arus ilustratif koridor" : "Jaringan belum tersedia"}
+          {mode === "assigned" ? "Pembebanan ruas OSRM" : mode === "proxy" ? "Arus relatif pada koridor OSRM" : "Menunggu geometri jalan"}
         </span>
       </div>
       <span className="pointer-events-none absolute bottom-3 right-3 z-[900] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[10px] font-bold tracking-wide text-slate-700 shadow-sm">
         {label || (isBefore ? "SEBELUM" : "SESUDAH")}
       </span>
-      {roads.length === 0 && (
+      {roads.length === 0 && layer === "road" && (
         <div className="pointer-events-none absolute inset-x-5 top-1/2 z-[800] -translate-y-1/2 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 text-center text-xs leading-6 text-slate-600 shadow-sm">
-          Peta dasar tersedia. Jaringan koridor dan animasi kendaraan akan terlihat setelah rute OSRM berhasil dimuat.
+          {mode === "outdated"
+            ? "Jaringan lama belum memisahkan jalur darat dari ferry. Ganti denpasarNetworkBrowser.js dengan versi ROAD_FIX lalu refresh halaman."
+            : "Menunggu koridor jalan OSRM. Mobil tidak akan digambar di luar jaringan yang terverifikasi."}
+        </div>
+      )}
+      {layer === "od" && (
+        <div className="pointer-events-none absolute bottom-14 left-3 z-[900] max-w-[230px] rounded-lg bg-white/95 px-3 py-2 text-[10px] font-medium text-slate-600 shadow-sm">
+          Garis OD lurus hanya menunjukkan asal–tujuan, BUKAN rute jalan.
         </div>
       )}
     </div>
