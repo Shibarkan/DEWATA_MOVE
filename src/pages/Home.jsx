@@ -1,4 +1,3 @@
-
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import Reveal from "../components/ui/Reveal";
@@ -54,19 +53,15 @@ const researchFocus = [
 export default function Home({ onNavigate }) {
   return (
     <div className="overflow-hidden bg-white text-slate-900">
-
       {/* ==================================
           HERO
       ================================== */}
 
       <section className="border-b border-slate-100">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.2fr_0.8fr] lg:gap-20 lg:pb-28 lg:pt-28">
-
           {/* LEFT CONTENT */}
           <div>
             <div className="hero-enter mb-7 flex items-center gap-3">
-              <span className="h-[2px] w-8 bg-[#B91C1C]" />
-
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
                 Studi Transportasi Kota Denpasar
               </p>
@@ -77,18 +72,14 @@ export default function Home({ onNavigate }) {
               <br />
               pergerakan kota.
               <br />
-              <span className="text-[#B91C1C]">
-                Merancang 2041.
-              </span>
+              <span className="text-[#B91C1C]">Merancang 2041.</span>
             </h1>
 
             <p className="hero-enter hero-delay-2 mt-8 max-w-xl text-[15px] leading-8 text-slate-600 sm:text-base">
-              Denpasar 2041 merupakan platform kajian
-              transportasi yang menghubungkan analisis
-              permintaan perjalanan, pemodelan jaringan,
-              dan strategi Transport Demand Management
-              untuk mendukung perencanaan mobilitas
-              perkotaan.
+              Denpasar 2041 merupakan platform kajian transportasi yang
+              menghubungkan analisis permintaan perjalanan, pemodelan jaringan,
+              dan strategi Transport Demand Management untuk mendukung
+              perencanaan mobilitas perkotaan.
             </p>
 
             <div className="hero-enter hero-delay-3 mt-9 flex flex-wrap items-center gap-4">
@@ -97,7 +88,6 @@ export default function Home({ onNavigate }) {
                 className="group inline-flex items-center gap-3 rounded-full bg-[#B91C1C] px-7 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#991B1B] hover:shadow-lg"
               >
                 Lihat Strategi TDM
-
                 <ArrowUpRight
                   size={17}
                   className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -109,7 +99,6 @@ export default function Home({ onNavigate }) {
                 className="group inline-flex items-center gap-2 px-2 py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:text-[#B91C1C]"
               >
                 Jelajahi Data
-
                 <ArrowRight
                   size={16}
                   className="transition-transform group-hover:translate-x-1"
@@ -121,23 +110,17 @@ export default function Home({ onNavigate }) {
           {/* RIGHT - STUDY SUMMARY */}
           <div className="hero-enter hero-delay-3">
             <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-[#FAFAFA]">
-
               <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 sm:px-8">
                 <p className="text-sm font-semibold text-slate-900">
                   Ringkasan studi
                 </p>
 
-                <span className="text-xs text-slate-400">
-                  2026-2041
-                </span>
+                <span className="text-xs text-slate-400">2026-2041</span>
               </div>
 
               <div className="divide-y divide-slate-200 px-6 sm:px-8">
                 {statistics.map((item) => (
-                  <div
-                    key={item.label}
-                    className="py-6"
-                  >
+                  <div key={item.label} className="py-6">
                     <p className="text-[29px] font-bold tracking-tight text-[#B91C1C] sm:text-4xl">
                       {item.value}
                     </p>
@@ -155,9 +138,8 @@ export default function Home({ onNavigate }) {
 
               <div className="border-t border-slate-200 bg-white px-6 py-5 sm:px-8">
                 <p className="text-xs leading-6 text-slate-500">
-                  Analisis menggunakan data studi kasus
-                  dan asumsi pemodelan yang dinyatakan
-                  secara terpisah.
+                  Analisis menggunakan data studi kasus dan asumsi pemodelan
+                  yang dinyatakan secara terpisah.
                 </p>
               </div>
             </div>
@@ -171,7 +153,6 @@ export default function Home({ onNavigate }) {
 
       <section className="px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-
           <Reveal>
             <div>
               <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
@@ -179,8 +160,8 @@ export default function Home({ onNavigate }) {
               </p>
 
               <h2 className="max-w-md text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl">
-                Persoalan transportasi tidak cukup
-                diselesaikan dengan menambah jalan.
+                Persoalan transportasi tidak cukup diselesaikan dengan menambah
+                jalan.
               </h2>
             </div>
           </Reveal>
@@ -188,39 +169,33 @@ export default function Home({ onNavigate }) {
           <Reveal delay={100}>
             <div className="space-y-5 text-[15px] leading-8 text-slate-600">
               <p>
-                Referensi mode share Bali tahun 2024
-                menunjukkan dominasi sepeda motor dan
-                mobil pribadi sebesar{" "}
+                Referensi mode share Bali tahun 2024 menunjukkan dominasi sepeda
+                motor dan mobil pribadi sebesar{" "}
                 <strong className="font-semibold text-slate-900">
                   {privateVehicleShareReference}%.
                 </strong>{" "}
-                Kondisi ini menjadi salah satu dasar
-                penting untuk mengkaji alternatif
-                mobilitas yang lebih efisien.
+                Kondisi ini menjadi salah satu dasar penting untuk mengkaji
+                alternatif mobilitas yang lebih efisien.
               </p>
 
               <p>
-                Berdasarkan MAT 2026, pasangan perjalanan
-                terbesar terdapat pada zona{" "}
+                Berdasarkan MAT 2026, pasangan perjalanan terbesar terdapat pada
+                zona{" "}
                 <strong className="font-semibold text-slate-900">
-                  Z{largestOD.origin} menuju
-                  Z{largestOD.destination}
+                  Z{largestOD.origin} menuju Z{largestOD.destination}
                 </strong>{" "}
                 dengan nilai{" "}
                 <strong className="font-semibold text-slate-900">
                   {formatNumber(largestOD.volume)} smp/jam.
                 </strong>{" "}
-                Distribusi tersebut menjadi masukan
-                untuk analisis pola perjalanan dan
-                pembebanan jaringan.
+                Distribusi tersebut menjadi masukan untuk analisis pola
+                perjalanan dan pembebanan jaringan.
               </p>
 
               <p>
-                Penelitian ini mengkaji bagaimana
-                kombinasi pengelolaan permintaan
-                perjalanan, peningkatan pelayanan
-                angkutan umum, dan pengaturan jaringan
-                dapat dievaluasi melalui skenario
+                Penelitian ini mengkaji bagaimana kombinasi pengelolaan
+                permintaan perjalanan, peningkatan pelayanan angkutan umum, dan
+                pengaturan jaringan dapat dievaluasi melalui skenario
                 transportasi menuju 2041.
               </p>
             </div>
@@ -234,7 +209,6 @@ export default function Home({ onNavigate }) {
 
       <section className="bg-[#F8F9FA] px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-7xl">
-
           <Reveal>
             <div className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div className="max-w-2xl">
@@ -247,10 +221,8 @@ export default function Home({ onNavigate }) {
                 </h2>
 
                 <p className="mt-4 text-sm leading-7 text-slate-600">
-                  Gambaran awal lingkungan visualisasi
-                  yang akan digunakan untuk menampilkan
-                  jaringan jalan dan hasil pembebanan
-                  lalu lintas.
+                  Gambaran awal lingkungan visualisasi yang akan digunakan untuk
+                  menampilkan jaringan jalan dan hasil pembebanan lalu lintas.
                 </p>
               </div>
 
@@ -270,12 +242,6 @@ export default function Home({ onNavigate }) {
           <Reveal delay={100}>
             <SimulationPreview />
           </Reveal>
-
-          <p className="mt-5 text-xs leading-6 text-slate-500">
-            Visualisasi di atas menggunakan jaringan
-            demonstrasi dan belum merepresentasikan
-            hasil simulasi geografis Denpasar.
-          </p>
         </div>
       </section>
 
@@ -285,7 +251,6 @@ export default function Home({ onNavigate }) {
 
       <section className="px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">
-
           <Reveal>
             <div className="mb-12 max-w-2xl">
               <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
@@ -300,12 +265,8 @@ export default function Home({ onNavigate }) {
 
           <div className="grid gap-0 border-t border-slate-200 md:grid-cols-3">
             {researchFocus.map((item, index) => (
-              <Reveal
-                key={item.number}
-                delay={index * 100}
-              >
+              <Reveal key={item.number} delay={index * 100}>
                 <div className="h-full border-b border-slate-200 py-8 md:border-r md:px-7 md:py-9 md:first:pl-0 md:last:border-r-0">
-
                   <p className="mb-8 text-sm font-bold text-[#B91C1C]">
                     {item.number}
                   </p>
@@ -330,7 +291,6 @@ export default function Home({ onNavigate }) {
 
       <section className="border-t border-slate-200 bg-white px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">
-
           <Reveal>
             <div className="mb-10 max-w-3xl">
               <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[#B91C1C]">
@@ -342,16 +302,14 @@ export default function Home({ onNavigate }) {
               </h2>
 
               <p className="mt-4 text-sm leading-7 text-slate-600">
-                Evaluasi dirancang menggunakan dasar
-                proyeksi permintaan dan jaringan yang
-                konsisten, sehingga perubahan indikator
-                dapat dibandingkan secara terukur.
+                Evaluasi dirancang menggunakan dasar proyeksi permintaan dan
+                jaringan yang konsisten, sehingga perubahan indikator dapat
+                dibandingkan secara terukur.
               </p>
             </div>
           </Reveal>
 
           <div className="grid gap-5 md:grid-cols-2">
-
             {/* BEFORE TDM */}
             <Reveal>
               <button
@@ -374,9 +332,8 @@ export default function Home({ onNavigate }) {
                 </h3>
 
                 <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-                  Proyeksi kondisi jaringan transportasi
-                  Denpasar pada 2041 tanpa tambahan
-                  intervensi TDM yang dikaji.
+                  Proyeksi kondisi jaringan transportasi Denpasar pada 2041
+                  tanpa tambahan intervensi TDM yang dikaji.
                 </p>
 
                 <p className="mt-auto pt-8 text-xs font-medium text-slate-400">
@@ -407,9 +364,8 @@ export default function Home({ onNavigate }) {
                 </h3>
 
                 <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-                  Proyeksi kondisi jaringan setelah
-                  penerapan kombinasi strategi pengelolaan
-                  permintaan dan peningkatan angkutan umum.
+                  Proyeksi kondisi jaringan setelah penerapan kombinasi strategi
+                  pengelolaan permintaan dan peningkatan angkutan umum.
                 </p>
 
                 <p className="mt-auto pt-8 text-xs font-medium text-[#B91C1C]">
@@ -435,7 +391,6 @@ export default function Home({ onNavigate }) {
           </Reveal>
         </div>
       </section>
-
     </div>
   );
 }

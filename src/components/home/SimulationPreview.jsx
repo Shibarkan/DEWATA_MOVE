@@ -30,7 +30,6 @@ import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
  * Data kendaraan tetap visualisasi ilustratif.
  * Hotspot MAT 2026 dihitung dari graph.mat; bukan peta kemacetan aktual.
  */
-
 const CITY = [-8.673, 115.216];
 const MAX_VEHICLES = 2100;
 const DEFAULT_DENSITY = 0.85;
@@ -275,7 +274,6 @@ function chooseNext(car, edge, graph, adjacency, flowIndex) {
     weighted[weighted.length - 1][0]
   );
 }
-
 export default function SimulationPreview({
   initialScenario = "before",
   showScenarioControls = false,
@@ -1325,61 +1323,93 @@ export default function SimulationPreview({
             </select>
           </label>
         </section>
-        {/* DATA TERTINGGI DI MAT TOR */}
-        {insights && (
-          <section className="min-w-0 rounded-xl border border-slate-200 p-4 sm:rounded-2xl sm:p-5 lg:col-span-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-900">
-                Prioritas Pergerakan dari MAT 2026 (ToR)
+        {/* SOROTAN MAT — RINGKAS, TANPA KARTU RANKING */}
+        {insights && insights.byOrigin.length > 0 && insights.byDestination.length > 0 && insights.odPairs.length > 0 && (
+          <section className="min-w-0 border-y border-slate-200 py-4 lg:col-span-3 sm:py-5">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-bold tracking-tight text-slate-900">
+                Sorotan pergerakan · MAT 2026
               </h3>
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-800">
-                Belum menunjukkan tingkat kemacetan aktual
-              </span>
+              <span className="text-[11px] text-slate-500">smp/jam · berdasarkan ToR</span>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-red-50 p-3">
-                <p className="text-[11px] font-semibold text-red-800">Asal perjalanan paling besar</p>
-                {insights.byOrigin.slice(0, 3).map((zone) => (
-                  <button key={zone.id}
-                    onClick={() => { setOrigin(zone.id); setShowOD(true); mapRef.current?.setView([zone.lat, zone.lng], 13.5, { animate: false }); }}
-                    className="mt-2 flex w-full items-center justify-between gap-3 text-left text-xs text-slate-800">
-                    <span>{zone.id} · {zone.name}</span>
-                    <strong className="shrink-0 tabular-nums">{formatNumber(zone.out)}</strong>
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-xl bg-blue-50 p-3">
-                <p className="text-[11px] font-semibold text-blue-800">Tujuan perjalanan paling besar</p>
-                {insights.byDestination.slice(0, 3).map((zone) => (
-                  <button key={zone.id}
-                    onClick={() => { setDestination(zone.id); setShowOD(true); mapRef.current?.setView([zone.lat, zone.lng], 13.5, { animate: false }); }}
-                    className="mt-2 flex w-full items-center justify-between gap-3 text-left text-xs text-slate-800">
-                    <span>{zone.id} · {zone.name}</span>
-                    <strong className="shrink-0 tabular-nums">{formatNumber(zone.incoming)}</strong>
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-xl bg-orange-50 p-3">
-                <p className="text-[11px] font-semibold text-orange-800">Hubungan OD paling dominan</p>
-                {insights.odPairs.slice(0, 3).map((pair) => (
-                  <button key={`${pair.origin.id}-${pair.destination.id}`}
-                    onClick={() => {
-                      setOrigin(pair.origin.id);
-                      setDestination(pair.destination.id);
-                      setShowOD(true);
-                    }}
-                    className="mt-2 flex w-full items-center justify-between gap-3 text-left text-xs text-slate-800">
-                    <span>{pair.origin.id} → {pair.destination.id}</span>
-                    <strong className="shrink-0 tabular-nums">{formatNumber(pair.value)}</strong>
-                  </button>
-                ))}
-              </div>
+
+            <div className="grid gap-4 sm:grid-cols-3 sm:gap-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const z = insights.byOrigin[0];
+                  setOrigin(z.id);
+                  setShowOD(true);
+                  mapRef.current?.setView([z.lat, z.lng], 13.5, { animate: false });
+                }}
+                className="group min-w-0 text-left sm:border-r sm:border-slate-200 sm:pr-5"
+                title="Fokus zona asal terbesar pada peta"
+              >
+                <span className="block text-[11px] text-slate-500">Asal terbesar</span>
+                <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
+                    {insights.byOrigin[0].id}
+                  </strong>
+                  <span className="text-xs text-slate-600">{formatNumber(insights.byOrigin[0].out)} smp/jam</span>
+                </span>
+                <span className="mt-1 block truncate text-[11px] text-slate-500">
+                  {insights.byOrigin[0].name}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const z = insights.byDestination[0];
+                  setDestination(z.id);
+                  setShowOD(true);
+                  mapRef.current?.setView([z.lat, z.lng], 13.5, { animate: false });
+                }}
+                className="group min-w-0 text-left sm:border-r sm:border-slate-200 sm:px-5"
+                title="Fokus zona tujuan terbesar pada peta"
+              >
+                <span className="block text-[11px] text-slate-500">Tujuan terbesar</span>
+                <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
+                    {insights.byDestination[0].id}
+                  </strong>
+                  <span className="text-xs text-slate-600">{formatNumber(insights.byDestination[0].incoming)} smp/jam</span>
+                </span>
+                <span className="mt-1 block truncate text-[11px] text-slate-500">
+                  {insights.byDestination[0].name}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const pair = insights.odPairs[0];
+                  setOrigin(pair.origin.id);
+                  setDestination(pair.destination.id);
+                  setShowOD(true);
+                  mapRef.current?.fitBounds([
+                    [pair.origin.lat, pair.origin.lng],
+                    [pair.destination.lat, pair.destination.lng],
+                  ], { padding: [60, 60], maxZoom: 13, animate: false });
+                }}
+                className="group min-w-0 text-left sm:pl-5"
+                title="Sorot hubungan OD terkuat pada peta"
+              >
+                <span className="block text-[11px] text-slate-500">Hubungan OD utama</span>
+                <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
+                    {insights.odPairs[0].origin.id} → {insights.odPairs[0].destination.id}
+                  </strong>
+                  <span className="text-xs text-slate-600">{formatNumber(insights.odPairs[0].value)} smp/jam</span>
+                </span>
+                <span className="mt-1 block text-[11px] text-slate-500">
+                  Klik untuk menyorot hubungan perjalanan
+                </span>
+              </button>
             </div>
-            <p className="mt-3 text-[11px] leading-5 text-slate-500">
-              Angka merupakan jumlah baris/kolom MAT dengan satuan smp/jam. Garis OD
-              merupakan garis keinginan perjalanan, bukan jalan yang dilewati. Data survei
-              ruas Jalan Tangkuban Perahu, Waturenggong, dan Gunung Agung dalam ToR
-              perlu dibandingkan sesuai tahun, waktu, dan satuannya sebelum kalibrasi.
+
+            <p className="mt-4 text-[11px] leading-5 text-slate-500">
+              Angka menunjukkan bangkitan, tarikan, dan hubungan perjalanan MAT; bukan tingkat kemacetan ruas jalan.
             </p>
           </section>
         )}

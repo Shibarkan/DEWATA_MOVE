@@ -3,6 +3,8 @@ import { Menu, X, ChevronDown, BusFront, Flower2, Sun } from "lucide-react";
 
 import AnimatedBus from "./AnimatedBus";
 
+import { ModelingDropdown, ModelingMobileLinks } from "../ModelingDropdown";
+
 /* ==========================================
    DEWATAMOVE 2041 — BALI HERITAGE HEADER
 ========================================== */
@@ -20,6 +22,7 @@ const groups = [
     label: "Modeling",
     links: [
       { id: "before", label: "Before TDM" },
+      { id: "process", label: "Proses TDM" },
       { id: "after", label: "After TDM" },
       { id: "comparison", label: "Perbandingan" },
     ],
@@ -252,23 +255,15 @@ export default function Header({ activePage = "home", onNavigate }) {
               </div>
             </button>
 
-            {/* TMD LOGO */}
+            {/* TMD LOGO
             <div className="dmh-tmd-logo hidden items-center justify-center rounded-full px-3 py-2 sm:flex">
-              {!logoError ? (
-                <img
-                  src="/tmd-logo.svg"
-                  alt="Logo Trans Metro Dewata"
-                  className="h-[19px] w-[105px] object-contain"
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <BusFront size={16} />
-
-                  <span className="text-xs font-black">TMD</span>
-                </div>
-              )}
-            </div>
+              <img
+                src="/tmd-logo.svg"
+                alt="Logo Trans Metro Dewata"
+                className="h-[19px] w-[105px] object-contain"
+                onError={() => setLogoError(true)}
+              />
+            </div> */}
           </div>
 
           {/* =================================
@@ -318,28 +313,13 @@ export default function Header({ activePage = "home", onNavigate }) {
                 {desktopGroup === group.id && (
                   <div
                     id={`dmh-dropdown-${group.id}`}
-                    className="dmh-dropdown absolute right-0 top-full z-30 mt-5 min-w-[220px] rounded-2xl p-2"
+                    className="dmh-dropdown dmh-model-dropdown absolute right-0 top-full z-30 mt-5 rounded-2xl p-2"
                   >
-                    {/* DROPDOWN TITLE */}
-                    <div className="dmh-dropdown-heading flex items-center gap-2 px-3 py-3">
-                      <Flower2 size={15} />
-
-                      <span className="text-[10px] font-bold uppercase tracking-[0.15em]">
-                        Mobility Simulation
-                      </span>
-                    </div>
-
-                    {group.links.map((link) => (
-                      <button
-                        key={link.id}
-                        type="button"
-                        onClick={() => go(link.id)}
-                        data-active={activePage === link.id}
-                        className="dmh-dropdown-link block w-full rounded-xl px-4 py-3 text-left text-sm font-medium"
-                      >
-                        {link.label}
-                      </button>
-                    ))}
+                    <ModelingDropdown
+                      links={group.links}
+                      activePage={activePage}
+                      onSelect={go}
+                    />
                   </div>
                 )}
               </div>
@@ -422,17 +402,11 @@ export default function Header({ activePage = "home", onNavigate }) {
 
                   {mobileGroup === group.id && (
                     <div className="dmh-mobile-submenu ml-4 space-y-1 border-l-2 pl-3">
-                      {group.links.map((link) => (
-                        <button
-                          key={link.id}
-                          type="button"
-                          onClick={() => go(link.id)}
-                          data-active={activePage === link.id}
-                          className="dmh-mobile-link block w-full rounded-lg px-4 py-2.5 text-left text-sm"
-                        >
-                          {link.label}
-                        </button>
-                      ))}
+                      <ModelingMobileLinks
+                        links={group.links}
+                        activePage={activePage}
+                        onSelect={go}
+                      />
                     </div>
                   )}
                 </div>
