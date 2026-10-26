@@ -1,468 +1,1812 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Minus, Plus, Pause, Play, LocateFixed, Route } from "lucide-react";
+
+import {
+  LocateFixed,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  Route,
+} from "lucide-react";
+
 import { MODEL_ZONES } from "../../data/modelEngine";
 
-/**
- * MODEL MAP — DewataMove 2041
- * Tailwind-only UI, Leaflet map, Canvas kendaraan (bukan CSS animation).
- * - Kendaraan mengikuti directed-edge koridor sampel / hasil AON assignment
- * - Lane offset di sebelah kiri arah pergerakan; arah edge tidak dibalik
- * - Posisi dan kendaraan dipertahankan saat zoom, pan, ganti parameter
- * - Mobil mengikuti jarak antar-kendaraan sederhana; kecepatan ilustratif
- * - Saat lintasan berakhir: fade-out, bukan teleport terlihat ke ruas lain
- * - Kamera dua peta dapat disinkronkan dari parent
- *
- * Penting: arus relatif/kecepatan = ilustrasi, BUKAN V/C atau kemacetan terukur.
- */
-const INITIAL = { lat: -8.667, lng: 115.218, zoom: 12 };
-const DARK = "#273445";
+/*
+  DEWATAMOVE 2041
+  LEAFLET MODELING MAP
+
+  Menggunakan:
+  - Leaflet
+  - OpenStreetMap
+  - Canvas 2D
+  - Tailwind CSS
+
+  Tanpa MapLibre.
+
+  Kendaraan:
+  - Mengikuti geometri OSRM
+  - Tetap di jalan ketika zoom
+  - Ukuran menyesuaikan zoom
+  - Bergerak sesuai arah ruas
+  - Tidak reset ketika zoom
+  - Populasi Before / After berbeda
+
+  Kompatibel:
+  - graph.edges
+  - graph.visualRoads
+  - trafficAssignment
+  - ModelOverview
+*/
+
 const RED = "#B91C1C";
 const TEAL = "#0F766E";
-const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
-const format = (n) => Math.round(n || 0).toLocaleString("id-ID");
-function hash(n) {
-  let x = Math.floor(n) | 0;
+
+const INITIAL_VIEW = {
+  lat: -8.667,
+  lng: 115.218,
+  zoom: 12,
+};
+
+const MAX_VEHICLES = 650;
+
+const COLORS = [
+  "#FFFFFF",
+  "#CBD5E1",
+  "#475569",
+  "#334155",
+  "#B91C1C",
+  "#2563EB",
+  "#0F766E",
+  "#D97706",
+];
+
+const clamp = (n, min, max) =>
+  Math.max(min, Math.min(max, n));
+
+// ==========================================
+// STABLE RANDOM
+// ==========================================
+
+function hash(value) {
+  let x = Math.floor(value) | 0;
+
   x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
   x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+
   return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
-function nodeKey(point) {
-  return `${Number(point[0]).toFixed(5)},${Number(point[1]).toFixed(5)}`;
+
+// ==========================================
+// COORDINATE VALIDATION
+// ==========================================
+
+function validPoint(point) {
+  if (
+    !Array.isArray(point) ||
+    !Number.isFinite(point[0]) ||
+    !Number.isFinite(point[1])
+  ) {
+    return false;
+  }
+
+  const [lat, lng] = point;
+
+  if (
+    lat < -8.82 ||
+    lat > -8.53 ||
+    lng < 115.07 ||
+    lng > 115.45
+  ) {
+    return false;
+  }
+
+  // Filter konservatif yang sama dengan
+  // jaringan Modeling sebelumnya.
+  // Bukan pengganti garis pantai resmi.
+
+  if (lat >= -8.63 && lng > 115.278) {
+    return false;
+  }
+
+  if (
+    lat < -8.63 &&
+    lat >= -8.72 &&
+    lng > 115.274
+  ) {
+    return false;
+  }
+
+  if (lat < -8.72 && lng > 115.265) {
+    return false;
+  }
+
+  return true;
 }
-function bearing(road) {
-  const cosLat = Math.cos(((road.a[0] + road.b[0]) / 2) * Math.PI / 180);
-  return Math.atan2(road.b[0] - road.a[0], (road.b[1] - road.a[1]) * cosLat);
+
+function distanceMeters(a, b) {
+  const latitude =
+    ((a[0] + b[0]) * Math.PI) / 360;
+
+  return Math.hypot(
+    (b[0] - a[0]) * 111320,
+    (b[1] - a[1]) *
+      111320 *
+      Math.cos(latitude)
+  );
 }
-function zoneMarker(id, active) {
-  return L.divIcon({
-    className: "",
-    html: `<div class="grid h-7 w-8 place-items-center rounded-lg border text-[10px] font-bold shadow-sm ${active ? "border-[#B91C1C] bg-[#B91C1C] text-white" : "border-slate-300 bg-white text-slate-700"}">${id}</div>`,
-    iconSize: [32, 28], iconAnchor: [16, 14],
-  });
+
+// ==========================================
+// PREPARE POLYLINE GEOMETRY
+// ==========================================
+
+function preparePath(path) {
+  if (
+    !Array.isArray(path) ||
+    path.length < 2 ||
+    !path.every(validPoint)
+  ) {
+    return null;
+  }
+
+  const cumulative = [0];
+  let total = 0;
+
+  for (let i = 1; i < path.length; i++) {
+    const distance = distanceMeters(
+      path[i - 1],
+      path[i]
+    );
+
+    // Tolak sambungan terlalu panjang
+    // yang mungkin bukan ruas jalan asli.
+
+    if (
+      !Number.isFinite(distance) ||
+      distance < 0.5 ||
+      distance > 250
+    ) {
+      return null;
+    }
+
+    total += distance;
+    cumulative.push(total);
+  }
+
+  if (total < 2) {
+    return null;
+  }
+
+  return {
+    path,
+    cumulative,
+    total,
+  };
 }
-function pressureColor(relative) {
-  // Skala warna KONSISTEN antara dua peta, relatif pada referensi Before.
-  if (relative >= 0.8) return RED;
-  if (relative >= 0.49) return "#E48C36";
-  if (relative >= 0.25) return "#D3AC4A";
+
+// ==========================================
+// PREPARE ROAD DATA
+// ==========================================
+
+function prepareRoads(graph, assignment, model) {
+  if (
+    !graph?.nodes?.length ||
+    !graph?.edges?.length
+  ) {
+    return [];
+  }
+
+  if (graph.metadata?.ferryFiltered !== true) {
+    return [];
+  }
+
+  const assigned = new Map(
+    (assignment?.roads || []).map((road) => [
+      Number(road.id),
+      road,
+    ])
+  );
+
+  const useAssignment =
+    assigned.size >= 20 &&
+    Number(assignment?.coverage || 0) > 0.03;
+
+  const growth =
+    (model?.beforeTotal || 1) /
+    Math.max(1, model?.base2026 || 1);
+
+  const afterRatio =
+    (model?.afterTotal || 1) /
+    Math.max(1, model?.beforeTotal || 1);
+
+  // Mendukung jaringan dengan full polyline
+  // maupun jaringan edges kecil OSRM.
+
+  const sources =
+    graph.visualRoads?.length
+      ? graph.visualRoads
+      : graph.edges.map((edge, id) => ({
+          id,
+          from: edge[0],
+          to: edge[1],
+          path: [
+            graph.nodes[edge[0]],
+            graph.nodes[edge[1]],
+          ],
+          pressure: edge[4],
+        }));
+
+  const roads = [];
+
+  for (const source of sources) {
+    const id = Number(source.id);
+
+    if (!Number.isInteger(id)) {
+      continue;
+    }
+
+    const geometry = preparePath(source.path);
+
+    if (!geometry) {
+      continue;
+    }
+
+    const edge = graph.edges[id];
+
+    const matched = assigned.get(id);
+
+    const proxyBefore =
+      Math.max(
+        0,
+        Number(
+          source.pressure ??
+          edge?.[4] ??
+          0
+        )
+      ) * growth;
+
+    const before = useAssignment
+      ? Math.max(
+          0,
+          Number(matched?.before || 0)
+        )
+      : proxyBefore;
+
+    const after = useAssignment
+      ? Math.max(
+          0,
+          Number(matched?.after || 0)
+        )
+      : proxyBefore * afterRatio;
+
+    if (before <= 0) {
+      continue;
+    }
+
+    roads.push({
+      id,
+
+      from:
+        source.from ??
+        edge?.[0],
+
+      to:
+        source.to ??
+        edge?.[1],
+
+      ...geometry,
+
+      before,
+      after,
+    });
+  }
+
+  return roads;
+}
+
+// ==========================================
+// ROAD PRESSURE
+// ==========================================
+
+function trafficColor(relative) {
+  if (relative >= 0.8) {
+    return RED;
+  }
+
+  if (relative >= 0.5) {
+    return "#E58C32";
+  }
+
+  if (relative >= 0.25) {
+    return "#D3AD4C";
+  }
+
   return TEAL;
 }
-function createRoads(assignment, graph, model) {
-  // Kunci utama: jalan sumber dan kendaraan harus memakai geometri yang SAMA.
-  // Network v2 hanya berisi OSRM step dengan mode "driving". Untuk v1,
-  // jangan menggambar mobil agar tidak ada mobil di ferry/perairan.
-  if (!graph?.nodes?.length || !graph?.edges?.length) {
-    return { mode: "unavailable", roads: [] };
+
+// ==========================================
+// VEHICLE SIZE BY ZOOM
+// ==========================================
+
+function getVehiclePreset(zoom) {
+  // Zoom jauh
+  if (zoom < 13.5) {
+    return {
+      level: "small",
+      car: [4.7, 2.4],
+      motor: [3.2, 1.6],
+      bus: [7.5, 3.2],
+      laneOffset: 0,
+      visibility: 0.22,
+    };
   }
-  if (graph.metadata?.ferryFiltered !== true) {
-    return { mode: "outdated", roads: [] };
+
+  // Zoom sedang
+  if (zoom < 16) {
+    return {
+      level: "medium",
+      car: [8.5, 4],
+      motor: [4.7, 2.2],
+      bus: [14, 5.2],
+      laneOffset: 0,
+      visibility: 0.58,
+    };
   }
-  const valid = (p) => Array.isArray(p) && p.length === 2 &&
-    Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
-    p[0] > -8.85 && p[0] < -8.53 && p[1] > 115.08 && p[1] < 115.45;
-  const assigned = new Map((assignment?.roads || []).map((r) => [r.id, r]));
-  const hasAssignment = assigned.size >= 20 && assignment.coverage > 0.03;
-  const growth = (model?.beforeTotal || 1) / Math.max(1, model?.base2026 || 1);
-  const policyRatio = (model?.afterTotal || 1) / Math.max(1, model?.beforeTotal || 1);
-  const roads = [];
-  graph.edges.forEach((edge, i) => {
-    const a = graph.nodes[edge[0]], b = graph.nodes[edge[1]];
-    if (!valid(a) || !valid(b)) return;
-    const length = Number(edge[2]) || 0;
-    // Long-gap / invalid links are not converted to artificial straight roads.
-    if (length < 1 || length > 1500) return;
-    const matched = hasAssignment ? assigned.get(i) : null;
-    const base = Math.max(0, Number(edge[4]) || 0) * growth;
-    const before = hasAssignment ? Math.max(0, matched?.before || 0) : base;
-    const after = hasAssignment ? Math.max(0, matched?.after || 0) : base * policyRatio;
-    if (!before) return;
-    roads.push({ id: i, key: String(i), a, b, length, before, after });
-  });
-  return { mode: hasAssignment ? "assigned" : "proxy", roads };
+
+  // Zoom dekat
+  return {
+    level: "large",
+    car: [15, 6.7],
+    motor: [7, 3],
+    bus: [24, 8.5],
+
+    // Offset sangat kecil agar tidak
+    // terlihat keluar dari geometri jalan.
+    laneOffset:
+      zoom >= 17
+        ? Math.min(1.8, (zoom - 16) * 0.65)
+        : 0,
+
+    visibility: 1,
+  };
 }
-function buildVehiclePopulation(roads, previousCars) {
-  if (!roads.length) return [];
-  const old = new Map(previousCars.map((c) => [c.id, c]));
-  const available = new Set(roads.map((r) => String(r.id)));
-  const maxVehicles = typeof window !== "undefined" && window.innerWidth < 768 ? 280 : 620;
-  const sortedFlow = roads.map((r) => r.before).sort((a, b) => b - a);
-  const p90 = sortedFlow[Math.min(sortedFlow.length - 1, Math.floor(sortedFlow.length * 0.1))] || 1;
-  const ordered = [...roads].sort((a, b) => a.id - b.id);
-  const vehicles = [];
-  for (const road of ordered) {
-    const relative = clamp(road.before / Math.max(1, p90), 0, 2.3);
-    const ideal = Math.min(9, (road.length / 32) * (0.30 + 1.1 * Math.sqrt(relative)));
-    const count = Math.min(Math.floor(road.length / 15), Math.floor(ideal) + (hash(road.id * 19 + 7) < ideal % 1 ? 1 : 0));
-    for (let k = 0; k < count; k++) {
-      const id = `${road.id}:${k}`;
-      const prev = old.get(id);
-      const seed = Number(road.id) * 977 + k * 73;
-      const roll = hash(seed + 4);
-      vehicles.push({
-        id, roadKey: prev && available.has(prev.roadKey) ? prev.roadKey : String(road.id),
-        originalKey: String(road.id),
-        t: prev?.t ?? ((k + 0.5) / Math.max(1, count)),
-        speed: prev?.speed ?? 4.0,
-        opacity: prev?.opacity ?? 0,
-        visibleRank: hash(seed + 37),
-        kind: roll < 0.61 ? "motor" : roll < 0.94 ? "car" : "bus",
-        color: ["#FFFFFF", "#CBD5E1", "#334155", "#B91C1C", "#3B82F6", "#0F766E"][Math.floor(hash(seed + 11) * 6)],
-        seed: prev?.seed ?? seed, state: prev?.state ?? "moving", delay: prev?.delay ?? 0,
-        length: roll < 0.61 ? 2.3 : roll < 0.94 ? 4.5 : 10,
+
+// ==========================================
+// LOCATION ALONG POLYLINE
+// ==========================================
+
+function pointAlongRoad(road, distance) {
+  const target = clamp(
+    distance,
+    0,
+    road.total - 0.0001
+  );
+
+  const values = road.cumulative;
+
+  // Binary search untuk polyline panjang.
+  let low = 1;
+  let high = values.length - 1;
+
+  while (low < high) {
+    const mid = (low + high) >> 1;
+
+    if (values[mid] < target) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  const index = low;
+
+  const start = road.path[index - 1];
+  const end = road.path[index];
+
+  const segmentLength =
+    values[index] - values[index - 1];
+
+  const t =
+    (target - values[index - 1]) /
+    Math.max(segmentLength, 0.001);
+
+  return {
+    lat:
+      start[0] +
+      (end[0] - start[0]) * t,
+
+    lng:
+      start[1] +
+      (end[1] - start[1]) * t,
+
+    start,
+    end,
+  };
+}
+
+// ==========================================
+// ROAD SCENE
+// ==========================================
+
+function buildScene(roads) {
+  const byId = new Map();
+  const outgoing = new Map();
+
+  for (const road of roads) {
+    byId.set(road.id, road);
+
+    if (!outgoing.has(road.from)) {
+      outgoing.set(road.from, []);
+    }
+
+    outgoing.get(road.from).push(road);
+  }
+
+  return {
+    byId,
+    outgoing,
+  };
+}
+
+// ==========================================
+// CREATE VEHICLES
+// ==========================================
+
+function createVehicles(roads, previous = []) {
+  if (!roads.length) {
+    return [];
+  }
+
+  const old = new Map(
+    previous.map((vehicle) => [
+      vehicle.id,
+      vehicle,
+    ])
+  );
+
+  const roadIds = new Set(
+    roads.map((road) => road.id)
+  );
+
+  const values = roads
+    .map((road) => road.before)
+    .sort((a, b) => b - a);
+
+  const reference =
+    values[
+      Math.min(
+        values.length - 1,
+        Math.floor(values.length * 0.12)
+      )
+    ] || 1;
+
+  const result = [];
+
+  for (const road of roads) {
+    const density = clamp(
+      road.before / Math.max(reference, 1),
+      0,
+      2
+    );
+
+    // Populasi tetap pada ruas.
+    // Zoom hanya menentukan berapa
+    // kendaraan yang terlihat.
+
+    const ideal = Math.min(
+      5,
+      (road.total / 65) *
+        (0.28 + Math.sqrt(density) * 1.1)
+    );
+
+    const count = Math.min(
+      5,
+      Math.floor(ideal) +
+        (
+          hash(road.id * 19 + 7) <
+          ideal % 1
+            ? 1
+            : 0
+        )
+    );
+
+    for (let i = 0; i < count; i++) {
+      const id = `${road.id}:${i}`;
+
+      const saved = old.get(id);
+
+      const seed =
+        road.id * 977 + i * 73;
+
+      const roll = hash(seed + 5);
+
+      const kind =
+        roll < 0.48
+          ? "motor"
+          : roll < 0.94
+          ? "car"
+          : "bus";
+
+      const color =
+        kind === "bus"
+          ? RED
+          : COLORS[
+              Math.floor(
+                hash(seed + 11) *
+                  COLORS.length
+              )
+            ];
+
+      result.push({
+        id,
+        seed,
+
+        originalRoadId: road.id,
+
+        roadId:
+          saved &&
+          roadIds.has(saved.roadId)
+            ? saved.roadId
+            : road.id,
+
+        distance:
+          saved &&
+          roadIds.has(saved.roadId)
+            ? saved.distance
+            : road.total *
+              ((i + 0.5) / Math.max(count, 1)),
+
+        speed: saved?.speed ?? 4,
+        alpha: saved?.alpha ?? 0.3,
+
+        state:
+          saved?.state ?? "moving",
+
+        cooldown:
+          saved?.cooldown ?? 0,
+
+        kind,
+        color,
+
+        sample: hash(seed + 31),
+        afterSample: hash(seed + 47),
       });
     }
   }
-  if (vehicles.length <= maxVehicles) return vehicles;
-  // Sampling stabil: kendaraan sama saat map viewport berbeda / parameter berubah.
-  return Array.from({ length: maxVehicles }, (_, i) => vehicles[Math.floor((i + 0.5) * vehicles.length / maxVehicles)]);
+
+  return result
+    .sort((a, b) => a.sample - b.sample)
+    .slice(0, MAX_VEHICLES);
 }
-function paintVehicle(ctx, car, scale) {
+
+// ==========================================
+// CHOOSE CONNECTED ROAD
+// ==========================================
+
+function roadDirection(road, atEnd = false) {
+  const points = road.path;
+
+  const a = atEnd
+    ? points[points.length - 2]
+    : points[0];
+
+  const b = atEnd
+    ? points[points.length - 1]
+    : points[1];
+
+  return Math.atan2(
+    b[0] - a[0],
+    (b[1] - a[1]) *
+      Math.cos(
+        ((a[0] + b[0]) * Math.PI) / 360
+      )
+  );
+}
+
+function chooseNextRoad(current, scene) {
+  const candidates =
+    scene.outgoing.get(current.to) || [];
+
+  const options = candidates.filter(
+    (road) =>
+      road.id !== current.id &&
+      road.to !== current.from
+  );
+
+  if (!options.length) {
+    return null;
+  }
+
+  const heading =
+    roadDirection(current, true);
+
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const candidate of options) {
+    const nextHeading =
+      roadDirection(candidate, false);
+
+    const angle = Math.abs(
+      Math.atan2(
+        Math.sin(nextHeading - heading),
+        Math.cos(nextHeading - heading)
+      )
+    );
+
+    if (angle < bestScore) {
+      bestScore = angle;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+// ==========================================
+// SIMULATE VEHICLES
+// ==========================================
+
+function advanceVehicles(
+  vehicles,
+  scene,
+  dt,
+  after,
+  reference
+) {
+  for (const car of vehicles) {
+    if (car.state === "waiting") {
+      car.cooldown -= dt;
+
+      if (car.cooldown <= 0) {
+        car.roadId = car.originalRoadId;
+        car.distance = 0;
+        car.alpha = 0;
+        car.speed = 2;
+        car.state = "moving";
+      }
+
+      continue;
+    }
+
+    if (car.state === "leaving") {
+      car.alpha = Math.max(
+        0,
+        car.alpha - dt * 2.5
+      );
+
+      if (car.alpha <= 0) {
+        car.state = "waiting";
+        car.cooldown = 0.5;
+      }
+
+      continue;
+    }
+
+    let road = scene.byId.get(car.roadId);
+
+    if (!road) {
+      continue;
+    }
+
+    const flow = after
+      ? road.after
+      : road.before;
+
+    const pressure = clamp(
+      flow / Math.max(reference, 1),
+      0,
+      2
+    );
+
+    // Kecepatan visual dari tekanan arus.
+    // Bukan kecepatan hasil pengukuran.
+
+    const targetSpeed = clamp(
+      13 /
+        (1 + Math.pow(pressure * 1.6, 1.3)),
+      1.5,
+      13
+    );
+
+    car.speed += clamp(
+      targetSpeed - car.speed,
+      -3 * dt,
+      2.5 * dt
+    );
+
+    car.alpha = Math.min(
+      1,
+      car.alpha + dt * 1.8
+    );
+
+    let remaining =
+      car.speed * dt * 2.5;
+
+    // Ketika mencapai ujung ruas,
+    // lanjut ke ruas yang tersambung.
+    for (let hop = 0; hop < 8; hop++) {
+      const available =
+        road.total - car.distance;
+
+      if (remaining < available) {
+        car.distance += remaining;
+        break;
+      }
+
+      remaining -= Math.max(available, 0);
+
+      const next = chooseNextRoad(
+        road,
+        scene
+      );
+
+      if (!next) {
+        car.distance =
+          road.total - 0.001;
+
+        car.state = "leaving";
+        break;
+      }
+
+      car.roadId = next.id;
+      car.distance = 0;
+      road = next;
+
+      if (remaining <= 0) {
+        break;
+      }
+    }
+  }
+}
+
+// ==========================================
+// DRAW VEHICLE
+// ==========================================
+
+function drawVehicle(ctx, car, preset) {
+  const [length, width] =
+    preset[car.kind];
+
   if (car.kind === "motor") {
     ctx.fillStyle = "#1F2937";
-    ctx.fillRect(-4.5 * scale, -1.4 * scale, 9 * scale, 2.8 * scale);
+
+    ctx.fillRect(
+      -length / 2,
+      -width / 2,
+      length,
+      width
+    );
+
     ctx.fillStyle = car.color;
-    ctx.fillRect(-2 * scale, -1.9 * scale, 4 * scale, 3.8 * scale);
+
+    ctx.fillRect(
+      -length * 0.22,
+      -width * 0.58,
+      length * 0.44,
+      width * 1.16
+    );
+
     return;
   }
+
+  // Body memanjang searah sumbu X.
+  // Rotasi mengikuti garis jalan di layar.
+
+  ctx.fillStyle =
+    car.kind === "bus"
+      ? "#FFFFFF"
+      : car.color;
+
+  ctx.strokeStyle =
+    "#334155";
+
+  ctx.lineWidth = 0.5;
+
+  ctx.beginPath();
+
+  ctx.roundRect(
+    -length / 2,
+    -width / 2,
+    length,
+    width,
+    Math.max(1, width * 0.28)
+  );
+
+  ctx.fill();
+  ctx.stroke();
+
+  if (preset.level === "small") {
+    return;
+  }
+
+  // Kaca
+  ctx.fillStyle = "#9FC6DA";
+
+  ctx.beginPath();
+
+  ctx.roundRect(
+    -length * 0.08,
+    -width * 0.28,
+    length * 0.28,
+    width * 0.56,
+    Math.max(1, width * 0.12)
+  );
+
+  ctx.fill();
+
+  // Trans Metro Dewata
   if (car.kind === "bus") {
-    ctx.fillStyle = "#263445";
-    ctx.fillRect(-12 * scale, -4.2 * scale, 24 * scale, 8.4 * scale);
-    ctx.fillStyle = "#F8FAFC";
-    ctx.fillRect(-11 * scale, -3.4 * scale, 22 * scale, 6.8 * scale);
     ctx.fillStyle = RED;
-    ctx.fillRect(-10 * scale, 2 * scale, 20 * scale, 1.1 * scale);
-    ctx.fillStyle = "#94A3B8";
-    ctx.fillRect(-7 * scale, -2.4 * scale, 12 * scale, 3.5 * scale);
-    return;
+
+    ctx.fillRect(
+      -length * 0.44,
+      width * 0.23,
+      length * 0.88,
+      Math.max(1, width * 0.13)
+    );
   }
-  ctx.fillStyle = "#1F2937";
-  ctx.fillRect(-7.5 * scale, -3.4 * scale, 15 * scale, 6.8 * scale);
-  ctx.fillStyle = car.color;
-  ctx.fillRect(-6.8 * scale, -2.9 * scale, 13.6 * scale, 5.8 * scale);
-  ctx.fillStyle = "#9FC3D9";
-  ctx.fillRect(1.5 * scale, -2.4 * scale, 3 * scale, 4.8 * scale);
-}
-function sceneData(roads) {
-  const byId = new Map();
-  const outgoing = new Map();
-  for (const road of roads) {
-    road.angle = bearing(road);
-    byId.set(String(road.id), road);
-    const key = nodeKey(road.a);
-    if (!outgoing.has(key)) outgoing.set(key, []);
-    outgoing.get(key).push(road);
+
+  if (preset.level === "large") {
+    // Lampu kendaraan
+    ctx.fillStyle = "#FEF3C7";
+
+    ctx.fillRect(
+      length * 0.4,
+      -width * 0.3,
+      1.5,
+      1.5
+    );
+
+    ctx.fillRect(
+      length * 0.4,
+      width * 0.17,
+      1.5,
+      1.5
+    );
   }
-  return { byId, outgoing };
 }
-function chooseNext(car, road, scene, after) {
-  const choices = (scene.outgoing.get(nodeKey(road.b)) || [])
-    .filter((r) => r.key !== road.key && nodeKey(r.b) !== nodeKey(road.a));
-  if (!choices.length) return null;
-  const ranked = choices.map((r) => {
-    const a = Math.abs(Math.atan2(Math.sin(r.angle - road.angle), Math.cos(r.angle - road.angle)));
-    const straightness = a < 0.45 ? 4 : a < 1.2 ? 1.8 : 0.8;
-    const flow = Math.sqrt(Math.max(0, after ? r.after : r.before) + 1);
-    return { road: r, weight: straightness * (0.2 + flow) };
+
+// ==========================================
+// ZONE MARKERS
+// ==========================================
+
+function zoneIcon(id, active) {
+  return L.divIcon({
+    className: "",
+
+    html: `
+      <div style="
+        width:34px;
+        height:30px;
+        display:grid;
+        place-items:center;
+        border-radius:9px;
+        background:${active ? RED : "#FFFFFF"};
+        border:1px solid ${active ? RED : "#CBD5E1"};
+        color:${active ? "#FFFFFF" : "#334155"};
+        font:700 10px system-ui;
+        box-shadow:0 3px 12px rgba(15,23,42,.12);
+      ">
+        ${id}
+      </div>
+    `,
+
+    iconSize: [34, 30],
+    iconAnchor: [17, 15],
   });
-  const total = ranked.reduce((s, c) => s + c.weight, 0);
-  car.seed += 31;
-  let choice = hash(car.seed) * total;
-  for (const candidate of ranked) {
-    choice -= candidate.weight;
-    if (choice <= 0) return candidate.road;
-  }
-  return ranked[ranked.length - 1].road;
 }
+
+// ==========================================
+// MAIN MODEL MAP
+// ==========================================
 
 export default function ModelMap({
-  stage = "before", model, assignment, graph,
-  selectedZone = "Z11", onSelectZone,
-  label, compact = false, syncView, onViewChange,
+  stage = "before",
+  model,
+  assignment,
+  graph,
+
+  selectedZone = "Z11",
+  onSelectZone,
+
+  label,
+  compact = false,
+
+  syncView,
+  onViewChange,
 }) {
-  const element = useRef(null);
-  const canvas = useRef(null);
+  const mapContainerRef = useRef(null);
+  const canvasRef = useRef(null);
+
   const mapRef = useRef(null);
-  const roadLayer = useRef(null);
-  const zoneLayer = useRef(null);
-  const sceneRef = useRef({ byId: new Map(), outgoing: new Map() });
-  const carsRef = useRef([]);
-  const currentRef = useRef({});
-  const onSelectZoneRef = useRef(onSelectZone);
-  const onViewChangeRef = useRef(onViewChange);
-  const [playing, setPlaying] = useState(true);
-  const [layer, setLayer] = useState("road");
-  const [streetView, setStreetView] = useState(false);
-  const isBefore = stage === "before";
-  const { roads, mode } = useMemo(() => createRoads(assignment, graph, model), [assignment, graph, model]);
+  const roadLayerRef = useRef(null);
+  const zoneLayerRef = useRef(null);
+
+  const vehiclesRef = useRef([]);
+
+  const sceneRef = useRef({
+    byId: new Map(),
+    outgoing: new Map(),
+  });
+
+  const settingsRef = useRef({});
+
+  const selectRef = useRef(onSelectZone);
+  const viewRef = useRef(onViewChange);
+
+  const [playing, setPlaying] =
+    useState(true);
+
+  const [layer, setLayer] =
+    useState("road");
+
+  const isBefore =
+    stage === "before";
+
+  // ======================================
+  // PREPARE NETWORK
+  // ======================================
+
+  const roads = useMemo(
+    () =>
+      prepareRoads(
+        graph,
+        assignment,
+        model
+      ),
+    [graph, assignment, model]
+  );
+
   const reference = useMemo(() => {
-    if (!roads.length) return 1;
-    const flows = roads.map((r) => r.before).sort((a, b) => b - a);
-    return Math.max(1, flows[Math.min(flows.length - 1, Math.floor(flows.length * 0.14))]);
+    if (!roads.length) {
+      return 1;
+    }
+
+    const sorted = roads
+      .map((road) => road.before)
+      .sort((a, b) => b - a);
+
+    return Math.max(
+      1,
+      sorted[
+        Math.floor(sorted.length * 0.12)
+      ] || 1
+    );
   }, [roads]);
 
-  onSelectZoneRef.current = onSelectZone;
-  onViewChangeRef.current = onViewChange;
-  currentRef.current = { roads, mode, stage, reference, playing, layer, isBefore };
+  // Latest values for animation loop
+  settingsRef.current = {
+    isBefore,
+    playing,
+    layer,
+    reference,
+  };
+
+  selectRef.current = onSelectZone;
+  viewRef.current = onViewChange;
+
+  // ======================================
+  // INITIALIZE LEAFLET
+  // ======================================
 
   useEffect(() => {
-    if (!element.current || mapRef.current) return;
-    const map = L.map(element.current, {
-      center: [syncView?.lat ?? INITIAL.lat, syncView?.lng ?? INITIAL.lng],
-      zoom: syncView?.zoom ?? INITIAL.zoom,
-      minZoom: 10, maxZoom: 19, zoomSnap: 0.5, zoomDelta: 0.5,
-      zoomControl: false, scrollWheelZoom: true, preferCanvas: true,
-      zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
-      wheelPxPerZoomLevel: 130,
-    });
+    if (
+      !mapContainerRef.current ||
+      mapRef.current
+    ) {
+      return;
+    }
+
+    const map = L.map(
+      mapContainerRef.current,
+      {
+        center: [
+          syncView?.lat ?? INITIAL_VIEW.lat,
+          syncView?.lng ?? INITIAL_VIEW.lng,
+        ],
+
+        zoom:
+          syncView?.zoom ?? INITIAL_VIEW.zoom,
+
+        minZoom: 10,
+        maxZoom: 19,
+
+        zoomSnap: 0.5,
+        zoomDelta: 0.5,
+
+        zoomControl: false,
+
+        scrollWheelZoom: true,
+
+        // Mengurangi ketidaksesuaian
+        // sementara saat animasi zoom.
+        zoomAnimation: false,
+        markerZoomAnimation: false,
+        fadeAnimation: false,
+
+        preferCanvas: true,
+      }
+    );
+
     mapRef.current = map;
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-    roadLayer.current = L.layerGroup().addTo(map);
-    zoneLayer.current = L.layerGroup().addTo(map);
+
+    L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution:
+          "© OpenStreetMap contributors",
+      }
+    ).addTo(map);
+
+    roadLayerRef.current =
+      L.layerGroup().addTo(map);
+
+    zoneLayerRef.current =
+      L.layerGroup().addTo(map);
+
     const notifyView = () => {
       const center = map.getCenter();
-      onViewChangeRef.current?.({ lat: center.lat, lng: center.lng, zoom: map.getZoom() });
+
+      viewRef.current?.({
+        lat: center.lat,
+        lng: center.lng,
+        zoom: map.getZoom(),
+      });
     };
-    map.on("moveend zoomend", notifyView);
-    const observer = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => map.invalidateSize({ pan: false })) : null;
-    observer?.observe(element.current);
-    const timer = setTimeout(() => map.invalidateSize({ pan: false }), 120);
+
+    map.on(
+      "moveend zoomend",
+      notifyView
+    );
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            map.invalidateSize({
+              pan: false,
+            });
+          })
+        : null;
+
+    observer?.observe(
+      mapContainerRef.current
+    );
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize({
+        pan: false,
+      });
+    }, 150);
+
     return () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
+
       observer?.disconnect();
-      map.off("moveend zoomend", notifyView);
-      map.remove(); mapRef.current = null;
-      roadLayer.current = null; zoneLayer.current = null;
+
+      map.off(
+        "moveend zoomend",
+        notifyView
+      );
+
+      map.remove();
+
+      mapRef.current = null;
+      roadLayerRef.current = null;
+      zoneLayerRef.current = null;
     };
-    // MOUNT ONLY: props kept in currentRef/onViewChangeRef.
+
+    // Peta dibuat satu kali per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ======================================
+  // SYNC CAMERA
+  // ======================================
+
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !syncView) return;
+
+    if (!map || !syncView) {
+      return;
+    }
+
     const center = map.getCenter();
-    if (Math.abs(center.lat - syncView.lat) > 0.000008 ||
-        Math.abs(center.lng - syncView.lng) > 0.000008 ||
-        Math.abs(map.getZoom() - syncView.zoom) > 0.05) {
-      map.setView([syncView.lat, syncView.lng], syncView.zoom, { animate: false });
+
+    const changed =
+      Math.abs(
+        center.lat - syncView.lat
+      ) > 0.00001 ||
+      Math.abs(
+        center.lng - syncView.lng
+      ) > 0.00001 ||
+      Math.abs(
+        map.getZoom() - syncView.zoom
+      ) > 0.05;
+
+    if (changed) {
+      map.setView(
+        [
+          syncView.lat,
+          syncView.lng,
+        ],
+
+        syncView.zoom,
+
+        {
+          animate: false,
+        }
+      );
     }
   }, [syncView]);
 
+  // ======================================
+  // ZONE MARKERS
+  // ======================================
+
   useEffect(() => {
-    const group = zoneLayer.current;
-    if (!group) return;
+    const group = zoneLayerRef.current;
+
+    if (!group) {
+      return;
+    }
+
     group.clearLayers();
-    for (const z of MODEL_ZONES) {
-      L.marker([z.lat, z.lng], { icon: zoneMarker(z.id, z.id === selectedZone), title: z.name })
-        .bindTooltip(`${z.id} · ${z.name}`, { direction: "top" })
-        .on("click", () => onSelectZoneRef.current?.(z.id)).addTo(group);
+
+    for (const zone of MODEL_ZONES) {
+      L.marker(
+        [
+          zone.lat,
+          zone.lng,
+        ],
+
+        {
+          icon: zoneIcon(
+            zone.id,
+            zone.id === selectedZone
+          ),
+
+          title: zone.name,
+        }
+      )
+        .bindTooltip(
+          `${zone.id} · ${zone.name}`
+        )
+        .on("click", () => {
+          selectRef.current?.(zone.id);
+        })
+        .addTo(group);
     }
   }, [selectedZone]);
 
+  // ======================================
+  // ROAD LAYER & VEHICLES
+  // ======================================
+
   useEffect(() => {
-    const group = roadLayer.current;
-    if (!group) return;
+    const group = roadLayerRef.current;
+
+    if (!group) {
+      return;
+    }
+
     group.clearLayers();
-    const scene = sceneData(roads);
-    sceneRef.current = scene;
-    // Keep vehicle IDs/positions if the same edge is present on re-assignment.
-    carsRef.current = buildVehiclePopulation(roads, carsRef.current);
-    if (layer === "road" && roads.length) {
-      for (const r of roads) {
-        const flow = isBefore ? r.before : r.after;
-        if (!flow) continue;
-        const relative = clamp(flow / reference, 0, 2);
-        L.polyline([r.a, r.b], {
-          color: pressureColor(relative),
-          weight: 1.2 + 2.7 * Math.sqrt(clamp(relative, 0, 1.8)),
-          opacity: 0.28 + 0.34 * clamp(relative, 0, 1),
-          interactive: false,
-        }).addTo(group);
+
+    sceneRef.current =
+      buildScene(roads);
+
+    // Pertahankan posisi kendaraan
+    // saat data kebijakan diperbarui.
+    // Zoom tidak memanggil fungsi ini.
+
+    vehiclesRef.current =
+      createVehicles(
+        roads,
+        vehiclesRef.current
+      );
+
+    if (layer === "road") {
+      // Kelompokkan jalan berdasarkan
+      // warna supaya tidak membuat
+      // ribuan layer individual.
+
+      const buckets = [
+        [],
+        [],
+        [],
+        [],
+      ];
+
+      for (const road of roads) {
+        const flow = isBefore
+          ? road.before
+          : road.after;
+
+        if (flow <= 0) {
+          continue;
+        }
+
+        const relative = clamp(
+          flow / Math.max(reference, 1),
+          0,
+          2
+        );
+
+        const bucket =
+          relative >= 0.8
+            ? 3
+            : relative >= 0.5
+            ? 2
+            : relative >= 0.25
+            ? 1
+            : 0;
+
+        buckets[bucket].push(road.path);
       }
-    } else if (layer === "od") {
-      // HANYA ditampilkan ketika tombol OD diklik secara eksplisit.
-      // Garis ini bukan jalan dan tidak dipakai untuk animasi mobil.
-      for (const p of (model?.pairs || []).slice(0, 22)) {
-        L.polyline([[p.origin.lat, p.origin.lng], [p.destination.lat, p.destination.lng]], {
-          color: p.origin.id === selectedZone ? RED : "#64748B",
-          weight: p.origin.id === selectedZone ? 2.4 : 1.2,
-          opacity: p.origin.id === selectedZone ? 0.8 : 0.34,
-          dashArray: "5 8", interactive: false,
+
+      const colors = [
+        "#0F766E",
+        "#D3AD4C",
+        "#E58C32",
+        "#B91C1C",
+      ];
+
+      buckets.forEach((paths, index) => {
+        if (!paths.length) {
+          return;
+        }
+
+        L.polyline(paths, {
+          color: colors[index],
+          weight: 2.7,
+          opacity: 0.66,
+          interactive: false,
+          smoothFactor: 0,
         }).addTo(group);
+      });
+    }
+
+    if (layer === "od") {
+      // OD bukan jalan kendaraan.
+      // Hanya muncul ketika dipilih.
+
+      for (const pair of (
+        model?.pairs || []
+      ).slice(0, 20)) {
+        const focused =
+          pair.origin.id === selectedZone;
+
+        L.polyline(
+          [
+            [
+              pair.origin.lat,
+              pair.origin.lng,
+            ],
+            [
+              pair.destination.lat,
+              pair.destination.lng,
+            ],
+          ],
+
+          {
+            color:
+              focused ? RED : "#64748B",
+
+            opacity:
+              focused ? 0.75 : 0.23,
+
+            weight:
+              focused ? 2.4 : 1.1,
+
+            dashArray: "5 8",
+
+            interactive: false,
+          }
+        ).addTo(group);
       }
     }
-  }, [roads, model, selectedZone, layer, isBefore, reference]);
+  }, [
+    roads,
+    layer,
+    isBefore,
+    reference,
+    model,
+    selectedZone,
+  ]);
+
+  // ======================================
+  // CANVAS VEHICLE ANIMATION
+  // ======================================
 
   useEffect(() => {
-    const map = mapRef.current, layerCanvas = canvas.current;
-    if (!map || !layerCanvas) return;
-    const ctx = layerCanvas.getContext("2d", { alpha: true });
-    if (!ctx) return;
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || false;
-    let raf = 0, lastFrame = 0, lastPaint = 0;
-    const frame = (time) => {
-      raf = requestAnimationFrame(frame);
-      if (time - lastPaint < 30) return;
-      lastPaint = time;
-      const dt = clamp(lastFrame ? (time - lastFrame) / 1000 : 0, 0, 0.065);
-      lastFrame = time;
-      const { playing, layer, isBefore, reference } = currentRef.current;
-      const scene = sceneRef.current;
+    const map = mapRef.current;
+    const canvas = canvasRef.current;
+
+    if (!map || !canvas) {
+      return;
+    }
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      return;
+    }
+
+    let raf = 0;
+    let lastTime = 0;
+    let lastDraw = 0;
+
+    const reducedMotion =
+      window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)"
+      )?.matches || false;
+
+    function drawFrame(time) {
+      raf = requestAnimationFrame(drawFrame);
+
+      // Sekitar 30 FPS agar lebih ringan.
+      if (time - lastDraw < 32) {
+        return;
+      }
+
+      const dt = clamp(
+        lastTime
+          ? (time - lastTime) / 1000
+          : 0,
+        0,
+        0.07
+      );
+
+      lastTime = time;
+      lastDraw = time;
+
       const size = map.getSize();
-      const dpr = Math.min(1.8, window.devicePixelRatio || 1);
-      const pixelWidth = Math.max(1, Math.round(size.x * dpr));
-      const pixelHeight = Math.max(1, Math.round(size.y * dpr));
-      if (layerCanvas.width !== pixelWidth) layerCanvas.width = pixelWidth;
-      if (layerCanvas.height !== pixelHeight) layerCanvas.height = pixelHeight;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, size.x, size.y);
-      if (layer !== "road") return;
 
-      // Simple car-following queue on same directed edge.
-      const occupied = new Map();
-      for (const car of carsRef.current) {
-        if (car.state !== "moving") continue;
-        if (!occupied.has(car.roadKey)) occupied.set(car.roadKey, []);
-        occupied.get(car.roadKey).push(car);
-      }
-      for (const list of occupied.values()) list.sort((a, b) => b.t - a.t);
-      const projected = new Map();
-      const zoom = map.getZoom();
-      const vehicleScale = clamp((zoom - 12.0) / 5.1, 0.14, 1.15);
-      // OSRM centerline sama dengan peta dasar. Jangan geser kendaraan keluar
-      // garis jalan saat zoom jauh. Offset kiri hanya pada zoom sangat dekat.
-      const laneOffset = zoom < 17 ? 0 : clamp((zoom - 16) * 1.4, 0, 4.2);
-      for (const list of occupied.values()) {
-        for (let i = 0; i < list.length; i++) {
-          const car = list[i];
-          let road = scene.byId.get(car.roadKey);
-          if (!road) continue;
-          const volume = isBefore ? road.before : road.after;
-          const fraction = clamp(volume / Math.max(1, road.before), 0, 1);
-          const wanted = car.visibleRank < fraction ? 1 : 0;
-          car.opacity += (wanted - car.opacity) * Math.min(1, dt * 3.4);
-          if (car.opacity < 0.025 && wanted === 0) continue;
+      const dpr = Math.min(
+        2,
+        window.devicePixelRatio || 1
+      );
 
-          const pressure = clamp(volume / reference, 0, 2);
-          const desired = (14.5 / (1 + Math.pow(pressure * 2.1, 1.4))) *
-            (0.82 + hash(car.seed + 7) * 0.28);
-          let target = clamp(desired, 2.1, 14);
-          if (i > 0) {
-            const ahead = list[i - 1];
-            const gap = (ahead.t - car.t) * Math.max(1, road.length) - ahead.length - 2.6;
-            target = Math.min(target, Math.sqrt(Math.max(0, 2 * 2.7 * gap)));
-          }
-          if (playing && !reduced) {
-            car.speed = clamp(car.speed + clamp(target - car.speed, -3.5 * dt, 2.5 * dt), 0, 16);
-            let meters = car.speed * dt * 3.0; // visual time compression, independent of zoom
-            for (let hop = 0; meters > 0.001 && hop < 12; hop++) {
-              const remaining = (1 - car.t) * Math.max(0.1, road.length);
-              if (meters < remaining) { car.t += meters / road.length; break; }
-              meters -= remaining;
-              const next = chooseNext(car, road, scene, !isBefore);
-              if (!next) {
-                car.t = 1; car.state = "leaving"; car.delay = 1.1 + hash(car.seed) * 1.7;
-                break;
-              }
-              car.roadKey = next.key; car.t = 0; road = next;
-            }
-          }
-          if (car.state !== "moving") continue;
-          let endpoints = projected.get(road.key);
-          if (!endpoints) {
-            const a = map.latLngToContainerPoint(road.a);
-            const b = map.latLngToContainerPoint(road.b);
-            endpoints = [a.x, a.y, b.x, b.y];
-            projected.set(road.key, endpoints);
-          }
-          const [ax, ay, bx, by] = endpoints;
-          const dx = bx - ax, dy = by - ay;
-          const pixelLength = Math.hypot(dx, dy);
-          if (pixelLength < 0.15) continue;
-          // Perpendicular offset to the LEFT of travel direction on screen.
-          const x = ax + dx * car.t + (dy / pixelLength) * laneOffset;
-          const y = ay + dy * car.t - (dx / pixelLength) * laneOffset;
-          if (x < -18 || y < -18 || x > size.x + 18 || y > size.y + 18) continue;
-          ctx.save();
-          ctx.globalAlpha = car.opacity * clamp(Math.min(car.t, 1 - car.t) * 18, 0.2, 1);
-          if (zoom <= 13) {
-            ctx.beginPath(); ctx.arc(x, y, zoom < 12 ? 0.8 : 1.25, 0, 2 * Math.PI);
-            ctx.fillStyle = car.color; ctx.fill();
-          } else {
-            ctx.translate(x, y);
-            ctx.rotate(Math.atan2(dy, dx));
-            paintVehicle(ctx, car, vehicleScale);
-          }
-          ctx.restore();
-        }
+      const width = Math.max(
+        1,
+        Math.round(size.x * dpr)
+      );
+
+      const height = Math.max(
+        1,
+        Math.round(size.y * dpr)
+      );
+
+      if (canvas.width !== width) {
+        canvas.width = width;
       }
-      // End of corridor: fade out, then return to SAME starting corridor invisibly.
-      for (const car of carsRef.current) {
-        if (car.state !== "leaving") continue;
-        car.opacity = Math.max(0, car.opacity - dt * 1.9);
-        car.delay -= dt;
-        if (car.delay <= 0 && car.opacity < 0.02) {
-          car.roadKey = car.originalKey; car.t = 0.005;
-          car.state = "moving"; car.speed = 2; car.seed += 17;
-        }
+
+      if (canvas.height !== height) {
+        canvas.height = height;
       }
+
+      canvas.style.width = `${size.x}px`;
+      canvas.style.height = `${size.y}px`;
+
+      ctx.setTransform(
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+      );
+
+      ctx.clearRect(
+        0,
+        0,
+        size.x,
+        size.y
+      );
+
+      const settings = settingsRef.current;
+
+      if (settings.layer !== "road") {
+        return;
+      }
+
+      const scene = sceneRef.current;
+      const vehicles = vehiclesRef.current;
+
+      const after = !settings.isBefore;
+
+      if (
+        settings.playing &&
+        !reducedMotion
+      ) {
+        advanceVehicles(
+          vehicles,
+          scene,
+          dt,
+          after,
+          settings.reference
+        );
+      }
+
+      const preset =
+        getVehiclePreset(map.getZoom());
+
+      // ==================================
+      // DRAW VEHICLES
+      // ==================================
+
+      for (const car of vehicles) {
+        if (
+          car.state === "waiting" ||
+          car.sample > preset.visibility
+        ) {
+          continue;
+        }
+
+        const road =
+          scene.byId.get(car.roadId);
+
+        if (!road) {
+          continue;
+        }
+
+        // Populasi After mengikuti
+        // rasio arus di ruas yang sama.
+
+        const afterRatio = clamp(
+          road.after /
+            Math.max(1, road.before),
+          0,
+          1
+        );
+
+        if (
+          after &&
+          car.afterSample > afterRatio
+        ) {
+          continue;
+        }
+
+        const point = pointAlongRoad(
+          road,
+          car.distance
+        );
+
+        // Koordinat posisi kendaraan,
+        // arah, dan jalan diproyeksikan
+        // oleh instance Leaflet yang sama.
+
+        const position =
+          map.latLngToContainerPoint([
+            point.lat,
+            point.lng,
+          ]);
+
+        const screenStart =
+          map.latLngToContainerPoint(
+            point.start
+          );
+
+        const screenEnd =
+          map.latLngToContainerPoint(
+            point.end
+          );
+
+        const dx =
+          screenEnd.x - screenStart.x;
+
+        const dy =
+          screenEnd.y - screenStart.y;
+
+        const length =
+          Math.hypot(dx, dy);
+
+        if (length < 0.001) {
+          continue;
+        }
+
+        const angle =
+          Math.atan2(dy, dx);
+
+        // Sisi kiri arah gerak.
+        // Offset dinonaktifkan pada
+        // zoom jauh dan sedang.
+
+        const offset =
+          preset.laneOffset;
+
+        const x =
+          position.x +
+          (dy / length) * offset;
+
+        const y =
+          position.y -
+          (dx / length) * offset;
+
+        if (
+          x < -30 ||
+          y < -30 ||
+          x > size.x + 30 ||
+          y > size.y + 30
+        ) {
+          continue;
+        }
+
+        ctx.save();
+
+        ctx.globalAlpha =
+          clamp(car.alpha, 0, 1);
+
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        drawVehicle(ctx, car, preset);
+
+        ctx.restore();
+      }
+    }
+
+    raf = requestAnimationFrame(drawFrame);
+
+    return () => {
+      cancelAnimationFrame(raf);
     };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
   }, []);
 
-  const centerMap = useCallback(() => {
-    mapRef.current?.setView([INITIAL.lat, INITIAL.lng], 12, { animate: false });
-    setStreetView(false);
+  // ======================================
+  // VIEW CONTROLS
+  // ======================================
+
+  const resetView = useCallback(() => {
+    mapRef.current?.setView(
+      [
+        INITIAL_VIEW.lat,
+        INITIAL_VIEW.lng,
+      ],
+      INITIAL_VIEW.zoom,
+      {
+        animate: false,
+      }
+    );
   }, []);
-  const focusStreet = useCallback(() => {
-    mapRef.current?.setView([-8.657, 115.218], 16, { animate: false });
-    setStreetView(true);
-  }, []);
+
+  // ======================================
+  // RENDER
+  // ======================================
 
   return (
-    <div className={`relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-[#EDF2F4] ${compact ? "h-[330px] sm:h-[390px] xl:h-[435px]" : "h-[420px] sm:h-[540px]"}`}>
-      <div ref={element} className="absolute inset-0 z-0" aria-label="Peta interaktif jaringan jalan Denpasar" />
-      <canvas ref={canvas} aria-hidden="true" className="pointer-events-none absolute inset-0 z-[450]" />
+    <div
+      className={`
+        relative min-w-0
+        overflow-hidden rounded-2xl
+        border border-slate-200
+        bg-[#EDF2F4]
+        ${
+          compact
+            ? "h-[330px] sm:h-[390px] xl:h-[435px]"
+            : "h-[420px] sm:h-[540px] lg:h-[600px]"
+        }
+      `}
+    >
+      {/* LEAFLET MAP */}
 
-      <div className="absolute left-3 top-3 z-[900] flex items-center gap-1 rounded-xl border border-slate-200/75 bg-white/95 p-1 shadow-sm">
-        <button type="button" onClick={() => setLayer("road")} className={`rounded-lg px-2.5 py-2 text-[11px] font-semibold ${layer === "road" ? "bg-[#B91C1C] text-white" : "text-slate-600 hover:bg-slate-100"}`}>Arus jalan</button>
-        <button type="button" onClick={() => setLayer("od")} className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-[11px] font-semibold ${layer === "od" ? "bg-[#B91C1C] text-white" : "text-slate-600 hover:bg-slate-100"}`}><Route size={12} />OD</button>
-      </div>
+      <div
+        ref={mapContainerRef}
+        className="absolute inset-0 z-0"
+        aria-label="Peta pemodelan Denpasar"
+      />
 
-      <div className="absolute right-3 top-3 z-[900] flex flex-col rounded-xl border border-slate-200 bg-white/95 shadow-sm">
-        <button type="button" onClick={() => mapRef.current?.zoomIn(0.5, { animate: false })} aria-label="Perbesar peta" className="grid h-9 w-9 place-items-center hover:bg-slate-100"><Plus size={16} /></button>
-        <button type="button" onClick={() => mapRef.current?.zoomOut(0.5, { animate: false })} aria-label="Perkecil peta" className="grid h-9 w-9 place-items-center border-y border-slate-200 hover:bg-slate-100"><Minus size={16} /></button>
-        <button type="button" onClick={streetView ? centerMap : focusStreet} aria-label={streetView ? "Tampilkan kota" : "Fokus jalan untuk melihat kendaraan"} className="grid h-9 w-9 place-items-center hover:bg-slate-100"><LocateFixed size={16} /></button>
-      </div>
+      {/* VEHICLE CANVAS */}
 
-      <div className="absolute bottom-3 left-3 z-[900] flex items-center gap-2">
-        <button type="button" onClick={() => setPlaying((v) => !v)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
-          {playing ? <Pause size={13} /> : <Play size={13} />}{playing ? "Jeda" : "Putar"}
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        className="
+          pointer-events-none
+          absolute inset-0
+          z-[450]
+        "
+      />
+
+      {/* MAP LAYERS */}
+
+      <div
+        className="
+          absolute left-3 top-3 z-[900]
+          flex items-center gap-1
+          rounded-xl
+          border border-slate-200
+          bg-white/95 p-1
+          shadow-sm
+        "
+      >
+        <button
+          type="button"
+          onClick={() => setLayer("road")}
+          className={`
+            rounded-lg px-3 py-2
+            text-[11px] font-semibold
+            transition-colors
+            ${
+              layer === "road"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }
+          `}
+        >
+          Arus jalan
         </button>
-        <span className="hidden rounded-lg bg-white/95 px-3 py-2 text-[10px] font-medium text-slate-500 shadow-sm sm:inline-block">
-          {mode === "assigned" ? "Pembebanan ruas OSRM" : mode === "proxy" ? "Arus relatif pada koridor OSRM" : "Menunggu geometri jalan"}
-        </span>
+
+        <button
+          type="button"
+          onClick={() => setLayer("od")}
+          className={`
+            flex items-center gap-1
+            rounded-lg px-3 py-2
+            text-[11px] font-semibold
+            transition-colors
+            ${
+              layer === "od"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }
+          `}
+        >
+          <Route size={13} />
+          OD
+        </button>
       </div>
-      <span className="pointer-events-none absolute bottom-3 right-3 z-[900] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[10px] font-bold tracking-wide text-slate-700 shadow-sm">
-        {label || (isBefore ? "SEBELUM" : "SESUDAH")}
+
+      {/* ZOOM CONTROLS */}
+
+      <div
+        className="
+          absolute right-3 top-3 z-[900]
+          flex flex-col overflow-hidden
+          rounded-xl border border-slate-200
+          bg-white/95 shadow-sm
+        "
+      >
+        <button
+          type="button"
+          aria-label="Perbesar peta"
+          onClick={() =>
+            mapRef.current?.zoomIn(0.5)
+          }
+          className="
+            grid h-10 w-10 place-items-center
+            text-slate-700 hover:bg-slate-100
+          "
+        >
+          <Plus size={17} />
+        </button>
+
+        <div className="mx-2 h-px bg-slate-200" />
+
+        <button
+          type="button"
+          aria-label="Perkecil peta"
+          onClick={() =>
+            mapRef.current?.zoomOut(0.5)
+          }
+          className="
+            grid h-10 w-10 place-items-center
+            text-slate-700 hover:bg-slate-100
+          "
+        >
+          <Minus size={17} />
+        </button>
+
+        <div className="mx-2 h-px bg-slate-200" />
+
+        <button
+          type="button"
+          aria-label="Kembali ke pusat Denpasar"
+          onClick={resetView}
+          className="
+            grid h-10 w-10 place-items-center
+            text-slate-700 hover:bg-slate-100
+          "
+        >
+          <LocateFixed size={17} />
+        </button>
+      </div>
+
+      {/* PLAY / PAUSE */}
+
+      <div
+        className="
+          absolute bottom-3 left-3 z-[900]
+          flex items-center gap-2
+        "
+      >
+        <button
+          type="button"
+          onClick={() =>
+            setPlaying((value) => !value)
+          }
+          className="
+            flex items-center gap-2
+            rounded-lg border border-slate-200
+            bg-white/95 px-3 py-2
+            text-[11px] font-semibold
+            text-slate-700 shadow-sm
+          "
+        >
+          {playing ? (
+            <Pause size={13} />
+          ) : (
+            <Play size={13} />
+          )}
+
+          {playing ? "Jeda" : "Putar"}
+        </button>
+      </div>
+
+      {/* STAGE LABEL */}
+
+      <span
+        className="
+          pointer-events-none
+          absolute bottom-3 right-3
+          z-[900]
+          rounded-lg
+          border border-slate-200
+          bg-white/95 px-3 py-2
+          text-[10px] font-bold
+          text-slate-700 shadow-sm
+        "
+      >
+        {label ||
+          (isBefore ? "SEBELUM" : "SESUDAH")}
       </span>
-      {roads.length === 0 && layer === "road" && (
-        <div className="pointer-events-none absolute inset-x-5 top-1/2 z-[800] -translate-y-1/2 rounded-xl border border-slate-200 bg-white/95 px-5 py-4 text-center text-xs leading-6 text-slate-600 shadow-sm">
-          {mode === "outdated"
-            ? "Jaringan lama belum memisahkan jalur darat dari ferry. Ganti denpasarNetworkBrowser.js dengan versi ROAD_FIX lalu refresh halaman."
-            : "Menunggu koridor jalan OSRM. Mobil tidak akan digambar di luar jaringan yang terverifikasi."}
+
+      {/* NO NETWORK */}
+
+      {!roads.length && layer === "road" && (
+        <div
+          className="
+            pointer-events-none
+            absolute inset-x-5 top-1/2 z-[800]
+            -translate-y-1/2
+            rounded-xl border border-slate-200
+            bg-white/95 px-5 py-4
+            text-center text-xs leading-6
+            text-slate-600 shadow-sm
+          "
+        >
+          Jaringan jalan Modeling belum tersedia.
+          Periksa koneksi OSRM atau data jaringan.
         </div>
       )}
+
+      {/* OD NOTE */}
+
       {layer === "od" && (
-        <div className="pointer-events-none absolute bottom-14 left-3 z-[900] max-w-[230px] rounded-lg bg-white/95 px-3 py-2 text-[10px] font-medium text-slate-600 shadow-sm">
-          Garis OD lurus hanya menunjukkan asal–tujuan, BUKAN rute jalan.
+        <div
+          className="
+            pointer-events-none
+            absolute bottom-14 left-3
+            z-[900]
+            max-w-[250px]
+            rounded-lg bg-white/95
+            px-3 py-2
+            text-[10px] text-slate-600
+            shadow-sm
+          "
+        >
+          Garis OD menunjukkan hubungan
+          asal–tujuan, bukan lintasan mobil.
         </div>
       )}
     </div>

@@ -217,12 +217,6 @@ function Explanation({ title = "Cara membaca data", children }) {
   );
 }
 
-/*
- * Grafik tren:
- * - Titik mewakili tahun.
- * - Tombol tahun menampilkan nilai terpilih.
- * - Tidak menyimpulkan sebab perubahan.
- */
 function LineChart({
   years,
   values,

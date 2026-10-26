@@ -7,18 +7,6 @@ import { MODEL_ZONES } from "../data/modelEngine";
 import { POLICY_SCENARIOS, createPolicyModel, normalizePolicy } from "../data/policyEngine";
 import { assignTraffic } from "../data/trafficAssignment";
 
-
-
-/**
- * DEWATAMOVE 2041 — Modeling Studio / Traffic Maps
- * Light mode, Tailwind CSS, satu file ModelOverview.
- * - Before: peta kondisi baseline
- * - Proses: slider terhubung ke dua peta (baseline & pratinjau)
- * - After: peta dari kebijakan tersimpan
- * - Perbandingan: ringkasan hasil dan heatmap OD (tanpa peta ganda)
- * - Tidak memakai grafik batang template, ikon dekoratif, atau stylesheet baru.
- * - MAT / hasil kebijakan = data model. Animasi mobil = ilustrasi gerak relatif.
- */
 const STAGES = [
   { id: "before", label: "Sebelum", title: "SEBELUM" },
   { id: "process", label: "Proses", title: "PROSES" },
@@ -331,7 +319,6 @@ function exportJSON(model, assignment, stage) {
 }
 
 
-/** Bukti hasil tersimpan HANYA ditulis setelah tombol Terapkan selesai. */
 function readCompletedRun() {
   try {
     if (typeof window === "undefined") return null;
@@ -362,7 +349,6 @@ function waitPaint() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-/** Modal modern memakai Motion; teks fase bergerak halus, bukan panel langkah bertumpuk. */
 function ProcessingModal({ phase, graphAvailable }) {
   const dialogRef = useRef(null);
   const reduceMotion = useReducedMotion();
@@ -469,7 +455,6 @@ function ProcessingModal({ phase, graphAvailable }) {
   );
 }
 
-/** Empty state yang SELALU terlihat ketika belum ada kebijakan diterapkan. */
 function EmptyResults({ stage, onNavigate }) {
   const reduceMotion = useReducedMotion();
   const after = stage === "after";
@@ -507,7 +492,6 @@ function EmptyResults({ stage, onNavigate }) {
 export default function ModelOverview({ type = "before", onNavigate }) {
   const stage = STAGES.some((x) => x.id === type) ? type : "before";
 
-  // Opening hanya saat komponen Modeling dipasang dari luar, bukan tiap ganti tab.
   const [intro, setIntro] = useState(true);
   const closeIntro = useCallback(() => setIntro(false), []);
   const [runInfo, setRunInfo] = useState(readCompletedRun);
@@ -525,7 +509,7 @@ export default function ModelOverview({ type = "before", onNavigate }) {
   const [error, setError] = useState("");
   const [details, setDetails] = useState(false);
 
-  // Notifikasi memakai Sonner, tidak ada lagi banner/alert custom.
+// NOTIF
   useEffect(() => {
     if (intro) return;
     if ((stage === "after" || stage === "comparison") && !ready) {
@@ -545,7 +529,6 @@ export default function ModelOverview({ type = "before", onNavigate }) {
   )), []);
   const updateDraft = (key, value) => setDraft((prev) => normalizePolicy({ ...prev, [key]: value }));
 
-  // Baseline dapat dihitung sebelum ada run, tetapi UI After tetap dikunci.
   const model = useMemo(() => createPolicyModel(applied), [applied]);
   const previewModel = useMemo(() => createPolicyModel(deferredDraft), [deferredDraft]);
   const assignment = useMemo(() => graph ? assignTraffic(graph, model) : null, [graph, model]);
@@ -580,8 +563,6 @@ export default function ModelOverview({ type = "before", onNavigate }) {
 
       setRunPhase(2);
       await waitPaint();
-      // Menghitung assignment nyata pada jaringan yang tersedia;
-      // tidak menggagalkan perhitungan matriks OD saat jaringan offline.
       let assigned = false;
       if (graph) {
         const traffic = assignTraffic(graph, computed);
