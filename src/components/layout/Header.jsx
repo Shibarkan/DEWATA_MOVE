@@ -225,6 +225,7 @@ export default function Header({ activePage = "home", onNavigate }) {
             relative z-10 mx-auto
             flex items-center justify-between gap-3
             transition-all duration-500
+            z-index-100
             ${
               scrolled
                 ? "h-[64px] px-4 sm:px-8"
@@ -254,16 +255,6 @@ export default function Header({ activePage = "home", onNavigate }) {
                 </span>
               </div>
             </button>
-
-            {/* TMD LOGO
-            <div className="dmh-tmd-logo hidden items-center justify-center rounded-full px-3 py-2 sm:flex">
-              <img
-                src="/tmd-logo.svg"
-                alt="Logo Trans Metro Dewata"
-                className="h-[19px] w-[105px] object-contain"
-                onError={() => setLogoError(true)}
-              />
-            </div> */}
           </div>
 
           {/* =================================

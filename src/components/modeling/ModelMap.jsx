@@ -1,23 +1,9 @@
-
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-import {
-  LocateFixed,
-  Minus,
-  Pause,
-  Play,
-  Plus,
-  Route,
-} from "lucide-react";
+import { addTmdNetworkLayer } from "../../data/tmdNetwork";
+import { LocateFixed, Minus, Pause, Play, Plus, Route } from "lucide-react";
 
 import { MODEL_ZONES } from "../../data/modelEngine";
 
@@ -70,8 +56,7 @@ const COLORS = [
   "#D97706",
 ];
 
-const clamp = (n, min, max) =>
-  Math.max(min, Math.min(max, n));
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 // ==========================================
 // STABLE RANDOM
@@ -101,12 +86,7 @@ function validPoint(point) {
 
   const [lat, lng] = point;
 
-  if (
-    lat < -8.82 ||
-    lat > -8.53 ||
-    lng < 115.07 ||
-    lng > 115.45
-  ) {
+  if (lat < -8.82 || lat > -8.53 || lng < 115.07 || lng > 115.45) {
     return false;
   }
 
@@ -118,11 +98,7 @@ function validPoint(point) {
     return false;
   }
 
-  if (
-    lat < -8.63 &&
-    lat >= -8.72 &&
-    lng > 115.274
-  ) {
+  if (lat < -8.63 && lat >= -8.72 && lng > 115.274) {
     return false;
   }
 
@@ -134,14 +110,11 @@ function validPoint(point) {
 }
 
 function distanceMeters(a, b) {
-  const latitude =
-    ((a[0] + b[0]) * Math.PI) / 360;
+  const latitude = ((a[0] + b[0]) * Math.PI) / 360;
 
   return Math.hypot(
     (b[0] - a[0]) * 111320,
-    (b[1] - a[1]) *
-      111320 *
-      Math.cos(latitude)
+    (b[1] - a[1]) * 111320 * Math.cos(latitude),
   );
 }
 
@@ -150,11 +123,7 @@ function distanceMeters(a, b) {
 // ==========================================
 
 function preparePath(path) {
-  if (
-    !Array.isArray(path) ||
-    path.length < 2 ||
-    !path.every(validPoint)
-  ) {
+  if (!Array.isArray(path) || path.length < 2 || !path.every(validPoint)) {
     return null;
   }
 
@@ -162,19 +131,12 @@ function preparePath(path) {
   let total = 0;
 
   for (let i = 1; i < path.length; i++) {
-    const distance = distanceMeters(
-      path[i - 1],
-      path[i]
-    );
+    const distance = distanceMeters(path[i - 1], path[i]);
 
     // Tolak sambungan terlalu panjang
     // yang mungkin bukan ruas jalan asli.
 
-    if (
-      !Number.isFinite(distance) ||
-      distance < 0.5 ||
-      distance > 250
-    ) {
+    if (!Number.isFinite(distance) || distance < 0.5 || distance > 250) {
       return null;
     }
 
@@ -198,10 +160,7 @@ function preparePath(path) {
 // ==========================================
 
 function prepareRoads(graph, assignment, model) {
-  if (
-    !graph?.nodes?.length ||
-    !graph?.edges?.length
-  ) {
+  if (!graph?.nodes?.length || !graph?.edges?.length) {
     return [];
   }
 
@@ -210,40 +169,29 @@ function prepareRoads(graph, assignment, model) {
   }
 
   const assigned = new Map(
-    (assignment?.roads || []).map((road) => [
-      Number(road.id),
-      road,
-    ])
+    (assignment?.roads || []).map((road) => [Number(road.id), road]),
   );
 
   const useAssignment =
-    assigned.size >= 20 &&
-    Number(assignment?.coverage || 0) > 0.03;
+    assigned.size >= 20 && Number(assignment?.coverage || 0) > 0.03;
 
-  const growth =
-    (model?.beforeTotal || 1) /
-    Math.max(1, model?.base2026 || 1);
+  const growth = (model?.beforeTotal || 1) / Math.max(1, model?.base2026 || 1);
 
   const afterRatio =
-    (model?.afterTotal || 1) /
-    Math.max(1, model?.beforeTotal || 1);
+    (model?.afterTotal || 1) / Math.max(1, model?.beforeTotal || 1);
 
   // Mendukung jaringan dengan full polyline
   // maupun jaringan edges kecil OSRM.
 
-  const sources =
-    graph.visualRoads?.length
-      ? graph.visualRoads
-      : graph.edges.map((edge, id) => ({
-          id,
-          from: edge[0],
-          to: edge[1],
-          path: [
-            graph.nodes[edge[0]],
-            graph.nodes[edge[1]],
-          ],
-          pressure: edge[4],
-        }));
+  const sources = graph.visualRoads?.length
+    ? graph.visualRoads
+    : graph.edges.map((edge, id) => ({
+        id,
+        from: edge[0],
+        to: edge[1],
+        path: [graph.nodes[edge[0]], graph.nodes[edge[1]]],
+        pressure: edge[4],
+      }));
 
   const roads = [];
 
@@ -265,27 +213,14 @@ function prepareRoads(graph, assignment, model) {
     const matched = assigned.get(id);
 
     const proxyBefore =
-      Math.max(
-        0,
-        Number(
-          source.pressure ??
-          edge?.[4] ??
-          0
-        )
-      ) * growth;
+      Math.max(0, Number(source.pressure ?? edge?.[4] ?? 0)) * growth;
 
     const before = useAssignment
-      ? Math.max(
-          0,
-          Number(matched?.before || 0)
-        )
+      ? Math.max(0, Number(matched?.before || 0))
       : proxyBefore;
 
     const after = useAssignment
-      ? Math.max(
-          0,
-          Number(matched?.after || 0)
-        )
+      ? Math.max(0, Number(matched?.after || 0))
       : proxyBefore * afterRatio;
 
     if (before <= 0) {
@@ -295,13 +230,9 @@ function prepareRoads(graph, assignment, model) {
     roads.push({
       id,
 
-      from:
-        source.from ??
-        edge?.[0],
+      from: source.from ?? edge?.[0],
 
-      to:
-        source.to ??
-        edge?.[1],
+      to: source.to ?? edge?.[1],
 
       ...geometry,
 
@@ -371,10 +302,7 @@ function getVehiclePreset(zoom) {
 
     // Offset sangat kecil agar tidak
     // terlihat keluar dari geometri jalan.
-    laneOffset:
-      zoom >= 17
-        ? Math.min(1.8, (zoom - 16) * 0.65)
-        : 0,
+    laneOffset: zoom >= 17 ? Math.min(1.8, (zoom - 16) * 0.65) : 0,
 
     visibility: 1,
   };
@@ -385,11 +313,7 @@ function getVehiclePreset(zoom) {
 // ==========================================
 
 function pointAlongRoad(road, distance) {
-  const target = clamp(
-    distance,
-    0,
-    road.total - 0.0001
-  );
+  const target = clamp(distance, 0, road.total - 0.0001);
 
   const values = road.cumulative;
 
@@ -412,21 +336,14 @@ function pointAlongRoad(road, distance) {
   const start = road.path[index - 1];
   const end = road.path[index];
 
-  const segmentLength =
-    values[index] - values[index - 1];
+  const segmentLength = values[index] - values[index - 1];
 
-  const t =
-    (target - values[index - 1]) /
-    Math.max(segmentLength, 0.001);
+  const t = (target - values[index - 1]) / Math.max(segmentLength, 0.001);
 
   return {
-    lat:
-      start[0] +
-      (end[0] - start[0]) * t,
+    lat: start[0] + (end[0] - start[0]) * t,
 
-    lng:
-      start[1] +
-      (end[1] - start[1]) * t,
+    lng: start[1] + (end[1] - start[1]) * t,
 
     start,
     end,
@@ -466,37 +383,19 @@ function createVehicles(roads, previous = []) {
     return [];
   }
 
-  const old = new Map(
-    previous.map((vehicle) => [
-      vehicle.id,
-      vehicle,
-    ])
-  );
+  const old = new Map(previous.map((vehicle) => [vehicle.id, vehicle]));
 
-  const roadIds = new Set(
-    roads.map((road) => road.id)
-  );
+  const roadIds = new Set(roads.map((road) => road.id));
 
-  const values = roads
-    .map((road) => road.before)
-    .sort((a, b) => b - a);
+  const values = roads.map((road) => road.before).sort((a, b) => b - a);
 
   const reference =
-    values[
-      Math.min(
-        values.length - 1,
-        Math.floor(values.length * 0.12)
-      )
-    ] || 1;
+    values[Math.min(values.length - 1, Math.floor(values.length * 0.12))] || 1;
 
   const result = [];
 
   for (const road of roads) {
-    const density = clamp(
-      road.before / Math.max(reference, 1),
-      0,
-      2
-    );
+    const density = clamp(road.before / Math.max(reference, 1), 0, 2);
 
     // Populasi tetap pada ruas.
     // Zoom hanya menentukan berapa
@@ -504,19 +403,12 @@ function createVehicles(roads, previous = []) {
 
     const ideal = Math.min(
       5,
-      (road.total / 65) *
-        (0.28 + Math.sqrt(density) * 1.1)
+      (road.total / 65) * (0.28 + Math.sqrt(density) * 1.1),
     );
 
     const count = Math.min(
       5,
-      Math.floor(ideal) +
-        (
-          hash(road.id * 19 + 7) <
-          ideal % 1
-            ? 1
-            : 0
-        )
+      Math.floor(ideal) + (hash(road.id * 19 + 7) < ideal % 1 ? 1 : 0),
     );
 
     for (let i = 0; i < count; i++) {
@@ -524,27 +416,16 @@ function createVehicles(roads, previous = []) {
 
       const saved = old.get(id);
 
-      const seed =
-        road.id * 977 + i * 73;
+      const seed = road.id * 977 + i * 73;
 
       const roll = hash(seed + 5);
 
-      const kind =
-        roll < 0.48
-          ? "motor"
-          : roll < 0.94
-          ? "car"
-          : "bus";
+      const kind = roll < 0.48 ? "motor" : roll < 0.94 ? "car" : "bus";
 
       const color =
         kind === "bus"
           ? RED
-          : COLORS[
-              Math.floor(
-                hash(seed + 11) *
-                  COLORS.length
-              )
-            ];
+          : COLORS[Math.floor(hash(seed + 11) * COLORS.length)];
 
       result.push({
         id,
@@ -552,27 +433,19 @@ function createVehicles(roads, previous = []) {
 
         originalRoadId: road.id,
 
-        roadId:
-          saved &&
-          roadIds.has(saved.roadId)
-            ? saved.roadId
-            : road.id,
+        roadId: saved && roadIds.has(saved.roadId) ? saved.roadId : road.id,
 
         distance:
-          saved &&
-          roadIds.has(saved.roadId)
+          saved && roadIds.has(saved.roadId)
             ? saved.distance
-            : road.total *
-              ((i + 0.5) / Math.max(count, 1)),
+            : road.total * ((i + 0.5) / Math.max(count, 1)),
 
         speed: saved?.speed ?? 4,
         alpha: saved?.alpha ?? 0.3,
 
-        state:
-          saved?.state ?? "moving",
+        state: saved?.state ?? "moving",
 
-        cooldown:
-          saved?.cooldown ?? 0,
+        cooldown: saved?.cooldown ?? 0,
 
         kind,
         color,
@@ -583,9 +456,7 @@ function createVehicles(roads, previous = []) {
     }
   }
 
-  return result
-    .sort((a, b) => a.sample - b.sample)
-    .slice(0, MAX_VEHICLES);
+  return result.sort((a, b) => a.sample - b.sample).slice(0, MAX_VEHICLES);
 }
 
 // ==========================================
@@ -595,52 +466,40 @@ function createVehicles(roads, previous = []) {
 function roadDirection(road, atEnd = false) {
   const points = road.path;
 
-  const a = atEnd
-    ? points[points.length - 2]
-    : points[0];
+  const a = atEnd ? points[points.length - 2] : points[0];
 
-  const b = atEnd
-    ? points[points.length - 1]
-    : points[1];
+  const b = atEnd ? points[points.length - 1] : points[1];
 
   return Math.atan2(
     b[0] - a[0],
-    (b[1] - a[1]) *
-      Math.cos(
-        ((a[0] + b[0]) * Math.PI) / 360
-      )
+    (b[1] - a[1]) * Math.cos(((a[0] + b[0]) * Math.PI) / 360),
   );
 }
 
 function chooseNextRoad(current, scene) {
-  const candidates =
-    scene.outgoing.get(current.to) || [];
+  const candidates = scene.outgoing.get(current.to) || [];
 
   const options = candidates.filter(
-    (road) =>
-      road.id !== current.id &&
-      road.to !== current.from
+    (road) => road.id !== current.id && road.to !== current.from,
   );
 
   if (!options.length) {
     return null;
   }
 
-  const heading =
-    roadDirection(current, true);
+  const heading = roadDirection(current, true);
 
   let best = null;
   let bestScore = Infinity;
 
   for (const candidate of options) {
-    const nextHeading =
-      roadDirection(candidate, false);
+    const nextHeading = roadDirection(candidate, false);
 
     const angle = Math.abs(
       Math.atan2(
         Math.sin(nextHeading - heading),
-        Math.cos(nextHeading - heading)
-      )
+        Math.cos(nextHeading - heading),
+      ),
     );
 
     if (angle < bestScore) {
@@ -656,13 +515,7 @@ function chooseNextRoad(current, scene) {
 // SIMULATE VEHICLES
 // ==========================================
 
-function advanceVehicles(
-  vehicles,
-  scene,
-  dt,
-  after,
-  reference
-) {
+function advanceVehicles(vehicles, scene, dt, after, reference) {
   for (const car of vehicles) {
     if (car.state === "waiting") {
       car.cooldown -= dt;
@@ -679,10 +532,7 @@ function advanceVehicles(
     }
 
     if (car.state === "leaving") {
-      car.alpha = Math.max(
-        0,
-        car.alpha - dt * 2.5
-      );
+      car.alpha = Math.max(0, car.alpha - dt * 2.5);
 
       if (car.alpha <= 0) {
         car.state = "waiting";
@@ -698,45 +548,29 @@ function advanceVehicles(
       continue;
     }
 
-    const flow = after
-      ? road.after
-      : road.before;
+    const flow = after ? road.after : road.before;
 
-    const pressure = clamp(
-      flow / Math.max(reference, 1),
-      0,
-      2
-    );
+    const pressure = clamp(flow / Math.max(reference, 1), 0, 2);
 
     // Kecepatan visual dari tekanan arus.
     // Bukan kecepatan hasil pengukuran.
 
     const targetSpeed = clamp(
-      13 /
-        (1 + Math.pow(pressure * 1.6, 1.3)),
+      13 / (1 + Math.pow(pressure * 1.6, 1.3)),
       1.5,
-      13
+      13,
     );
 
-    car.speed += clamp(
-      targetSpeed - car.speed,
-      -3 * dt,
-      2.5 * dt
-    );
+    car.speed += clamp(targetSpeed - car.speed, -3 * dt, 2.5 * dt);
 
-    car.alpha = Math.min(
-      1,
-      car.alpha + dt * 1.8
-    );
+    car.alpha = Math.min(1, car.alpha + dt * 1.8);
 
-    let remaining =
-      car.speed * dt * 2.5;
+    let remaining = car.speed * dt * 2.5;
 
     // Ketika mencapai ujung ruas,
     // lanjut ke ruas yang tersambung.
     for (let hop = 0; hop < 8; hop++) {
-      const available =
-        road.total - car.distance;
+      const available = road.total - car.distance;
 
       if (remaining < available) {
         car.distance += remaining;
@@ -745,14 +579,10 @@ function advanceVehicles(
 
       remaining -= Math.max(available, 0);
 
-      const next = chooseNextRoad(
-        road,
-        scene
-      );
+      const next = chooseNextRoad(road, scene);
 
       if (!next) {
-        car.distance =
-          road.total - 0.001;
+        car.distance = road.total - 0.001;
 
         car.state = "leaving";
         break;
@@ -774,27 +604,16 @@ function advanceVehicles(
 // ==========================================
 
 function drawVehicle(ctx, car, preset) {
-  const [length, width] =
-    preset[car.kind];
+  const [length, width] = preset[car.kind];
 
   if (car.kind === "motor") {
     ctx.fillStyle = "#1F2937";
 
-    ctx.fillRect(
-      -length / 2,
-      -width / 2,
-      length,
-      width
-    );
+    ctx.fillRect(-length / 2, -width / 2, length, width);
 
     ctx.fillStyle = car.color;
 
-    ctx.fillRect(
-      -length * 0.22,
-      -width * 0.58,
-      length * 0.44,
-      width * 1.16
-    );
+    ctx.fillRect(-length * 0.22, -width * 0.58, length * 0.44, width * 1.16);
 
     return;
   }
@@ -802,13 +621,9 @@ function drawVehicle(ctx, car, preset) {
   // Body memanjang searah sumbu X.
   // Rotasi mengikuti garis jalan di layar.
 
-  ctx.fillStyle =
-    car.kind === "bus"
-      ? "#FFFFFF"
-      : car.color;
+  ctx.fillStyle = car.kind === "bus" ? "#FFFFFF" : car.color;
 
-  ctx.strokeStyle =
-    "#334155";
+  ctx.strokeStyle = "#334155";
 
   ctx.lineWidth = 0.5;
 
@@ -819,7 +634,7 @@ function drawVehicle(ctx, car, preset) {
     -width / 2,
     length,
     width,
-    Math.max(1, width * 0.28)
+    Math.max(1, width * 0.28),
   );
 
   ctx.fill();
@@ -839,7 +654,7 @@ function drawVehicle(ctx, car, preset) {
     -width * 0.28,
     length * 0.28,
     width * 0.56,
-    Math.max(1, width * 0.12)
+    Math.max(1, width * 0.12),
   );
 
   ctx.fill();
@@ -852,7 +667,7 @@ function drawVehicle(ctx, car, preset) {
       -length * 0.44,
       width * 0.23,
       length * 0.88,
-      Math.max(1, width * 0.13)
+      Math.max(1, width * 0.13),
     );
   }
 
@@ -860,19 +675,9 @@ function drawVehicle(ctx, car, preset) {
     // Lampu kendaraan
     ctx.fillStyle = "#FEF3C7";
 
-    ctx.fillRect(
-      length * 0.4,
-      -width * 0.3,
-      1.5,
-      1.5
-    );
+    ctx.fillRect(length * 0.4, -width * 0.3, 1.5, 1.5);
 
-    ctx.fillRect(
-      length * 0.4,
-      width * 0.17,
-      1.5,
-      1.5
-    );
+    ctx.fillRect(length * 0.4, width * 0.17, 1.5, 1.5);
   }
 }
 
@@ -929,6 +734,7 @@ export default function ModelMap({
   const canvasRef = useRef(null);
 
   const mapRef = useRef(null);
+  const tmdLayerRef = useRef(null);
   const roadLayerRef = useRef(null);
   const zoneLayerRef = useRef(null);
 
@@ -944,27 +750,19 @@ export default function ModelMap({
   const selectRef = useRef(onSelectZone);
   const viewRef = useRef(onViewChange);
 
-  const [playing, setPlaying] =
-    useState(true);
+  const [playing, setPlaying] = useState(true);
 
-  const [layer, setLayer] =
-    useState("road");
+  const [layer, setLayer] = useState("road");
 
-  const isBefore =
-    stage === "before";
+  const isBefore = stage === "before";
 
   // ======================================
   // PREPARE NETWORK
   // ======================================
 
   const roads = useMemo(
-    () =>
-      prepareRoads(
-        graph,
-        assignment,
-        model
-      ),
-    [graph, assignment, model]
+    () => prepareRoads(graph, assignment, model),
+    [graph, assignment, model],
   );
 
   const reference = useMemo(() => {
@@ -972,16 +770,9 @@ export default function ModelMap({
       return 1;
     }
 
-    const sorted = roads
-      .map((road) => road.before)
-      .sort((a, b) => b - a);
+    const sorted = roads.map((road) => road.before).sort((a, b) => b - a);
 
-    return Math.max(
-      1,
-      sorted[
-        Math.floor(sorted.length * 0.12)
-      ] || 1
-    );
+    return Math.max(1, sorted[Math.floor(sorted.length * 0.12)] || 1);
   }, [roads]);
 
   // Latest values for animation loop
@@ -1000,60 +791,68 @@ export default function ModelMap({
   // ======================================
 
   useEffect(() => {
-    if (
-      !mapContainerRef.current ||
-      mapRef.current
-    ) {
+    if (!mapContainerRef.current || mapRef.current) {
       return;
     }
 
-    const map = L.map(
-      mapContainerRef.current,
-      {
-        center: [
-          syncView?.lat ?? INITIAL_VIEW.lat,
-          syncView?.lng ?? INITIAL_VIEW.lng,
-        ],
+    const map = L.map(mapContainerRef.current, {
+      center: [
+        syncView?.lat ?? INITIAL_VIEW.lat,
+        syncView?.lng ?? INITIAL_VIEW.lng,
+      ],
 
-        zoom:
-          syncView?.zoom ?? INITIAL_VIEW.zoom,
+      zoom: syncView?.zoom ?? INITIAL_VIEW.zoom,
 
-        minZoom: 10,
-        maxZoom: 19,
+      minZoom: 10,
+      maxZoom: 19,
 
-        zoomSnap: 0.5,
-        zoomDelta: 0.5,
+      zoomSnap: 0.5,
+      zoomDelta: 0.5,
 
-        zoomControl: false,
+      zoomControl: false,
 
-        scrollWheelZoom: true,
+      scrollWheelZoom: true,
 
-        // Mengurangi ketidaksesuaian
-        // sementara saat animasi zoom.
-        zoomAnimation: false,
-        markerZoomAnimation: false,
-        fadeAnimation: false,
+      // Mengurangi ketidaksesuaian
+      // sementara saat animasi zoom.
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+      fadeAnimation: false,
 
-        preferCanvas: true,
-      }
-    );
+      preferCanvas: true,
+    });
 
     mapRef.current = map;
 
-    L.tileLayer(
-      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom: 19,
-        attribution:
-          "© OpenStreetMap contributors",
-      }
-    ).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(map);
 
-    roadLayerRef.current =
-      L.layerGroup().addTo(map);
+    // CANVAS KENDARAAN: masukkan ke pane Leaflet
+    // agar posisinya tetap mengikuti peta saat zoom/pan.
+    const vehiclePane = map.createPane("dmVehiclePane");
+    vehiclePane.style.zIndex = "450";
+    vehiclePane.style.pointerEvents = "none";
 
-    zoneLayerRef.current =
-      L.layerGroup().addTo(map);
+    const vehicleCanvas = L.DomUtil.create(
+      "canvas",
+      "dm-vehicle-canvas",
+      vehiclePane,
+    );
+
+    vehicleCanvas.style.position = "absolute";
+    vehicleCanvas.style.left = "0";
+    vehicleCanvas.style.top = "0";
+    vehicleCanvas.style.pointerEvents = "none";
+
+    canvasRef.current = vehicleCanvas;
+
+    roadLayerRef.current = L.layerGroup().addTo(map);
+
+    zoneLayerRef.current = L.layerGroup().addTo(map);
+    // Jaringan Trans Metro Dewata
+    tmdLayerRef.current = addTmdNetworkLayer(map);
 
     const notifyView = () => {
       const center = map.getCenter();
@@ -1065,10 +864,7 @@ export default function ModelMap({
       });
     };
 
-    map.on(
-      "moveend zoomend",
-      notifyView
-    );
+    map.on("moveend zoomend", notifyView);
 
     const observer =
       typeof ResizeObserver !== "undefined"
@@ -1079,9 +875,7 @@ export default function ModelMap({
           })
         : null;
 
-    observer?.observe(
-      mapContainerRef.current
-    );
+    observer?.observe(mapContainerRef.current);
 
     const timer = window.setTimeout(() => {
       map.invalidateSize({
@@ -1094,11 +888,9 @@ export default function ModelMap({
 
       observer?.disconnect();
 
-      map.off(
-        "moveend zoomend",
-        notifyView
-      );
-
+      map.off("moveend zoomend", notifyView);
+      tmdLayerRef.current?.destroy?.();
+      tmdLayerRef.current = null;
       map.remove();
 
       mapRef.current = null;
@@ -1124,28 +916,19 @@ export default function ModelMap({
     const center = map.getCenter();
 
     const changed =
-      Math.abs(
-        center.lat - syncView.lat
-      ) > 0.00001 ||
-      Math.abs(
-        center.lng - syncView.lng
-      ) > 0.00001 ||
-      Math.abs(
-        map.getZoom() - syncView.zoom
-      ) > 0.05;
+      Math.abs(center.lat - syncView.lat) > 0.00001 ||
+      Math.abs(center.lng - syncView.lng) > 0.00001 ||
+      Math.abs(map.getZoom() - syncView.zoom) > 0.05;
 
     if (changed) {
       map.setView(
-        [
-          syncView.lat,
-          syncView.lng,
-        ],
+        [syncView.lat, syncView.lng],
 
         syncView.zoom,
 
         {
           animate: false,
-        }
+        },
       );
     }
   }, [syncView]);
@@ -1165,23 +948,15 @@ export default function ModelMap({
 
     for (const zone of MODEL_ZONES) {
       L.marker(
-        [
-          zone.lat,
-          zone.lng,
-        ],
+        [zone.lat, zone.lng],
 
         {
-          icon: zoneIcon(
-            zone.id,
-            zone.id === selectedZone
-          ),
+          icon: zoneIcon(zone.id, zone.id === selectedZone),
 
           title: zone.name,
-        }
+        },
       )
-        .bindTooltip(
-          `${zone.id} · ${zone.name}`
-        )
+        .bindTooltip(`${zone.id} · ${zone.name}`)
         .on("click", () => {
           selectRef.current?.(zone.id);
         })
@@ -1202,64 +977,37 @@ export default function ModelMap({
 
     group.clearLayers();
 
-    sceneRef.current =
-      buildScene(roads);
+    sceneRef.current = buildScene(roads);
 
     // Pertahankan posisi kendaraan
     // saat data kebijakan diperbarui.
     // Zoom tidak memanggil fungsi ini.
 
-    vehiclesRef.current =
-      createVehicles(
-        roads,
-        vehiclesRef.current
-      );
+    vehiclesRef.current = createVehicles(roads, vehiclesRef.current);
 
     if (layer === "road") {
       // Kelompokkan jalan berdasarkan
       // warna supaya tidak membuat
       // ribuan layer individual.
 
-      const buckets = [
-        [],
-        [],
-        [],
-        [],
-      ];
+      const buckets = [[], [], [], []];
 
       for (const road of roads) {
-        const flow = isBefore
-          ? road.before
-          : road.after;
+        const flow = isBefore ? road.before : road.after;
 
         if (flow <= 0) {
           continue;
         }
 
-        const relative = clamp(
-          flow / Math.max(reference, 1),
-          0,
-          2
-        );
+        const relative = clamp(flow / Math.max(reference, 1), 0, 2);
 
         const bucket =
-          relative >= 0.8
-            ? 3
-            : relative >= 0.5
-            ? 2
-            : relative >= 0.25
-            ? 1
-            : 0;
+          relative >= 0.8 ? 3 : relative >= 0.5 ? 2 : relative >= 0.25 ? 1 : 0;
 
         buckets[bucket].push(road.path);
       }
 
-      const colors = [
-        "#0F766E",
-        "#D3AD4C",
-        "#E58C32",
-        "#B91C1C",
-      ];
+      const colors = ["#0F766E", "#D3AD4C", "#E58C32", "#B91C1C"];
 
       buckets.forEach((paths, index) => {
         if (!paths.length) {
@@ -1280,49 +1028,30 @@ export default function ModelMap({
       // OD bukan jalan kendaraan.
       // Hanya muncul ketika dipilih.
 
-      for (const pair of (
-        model?.pairs || []
-      ).slice(0, 20)) {
-        const focused =
-          pair.origin.id === selectedZone;
+      for (const pair of (model?.pairs || []).slice(0, 20)) {
+        const focused = pair.origin.id === selectedZone;
 
         L.polyline(
           [
-            [
-              pair.origin.lat,
-              pair.origin.lng,
-            ],
-            [
-              pair.destination.lat,
-              pair.destination.lng,
-            ],
+            [pair.origin.lat, pair.origin.lng],
+            [pair.destination.lat, pair.destination.lng],
           ],
 
           {
-            color:
-              focused ? RED : "#64748B",
+            color: focused ? RED : "#64748B",
 
-            opacity:
-              focused ? 0.75 : 0.23,
+            opacity: focused ? 0.75 : 0.23,
 
-            weight:
-              focused ? 2.4 : 1.1,
+            weight: focused ? 2.4 : 1.1,
 
             dashArray: "5 8",
 
             interactive: false,
-          }
+          },
         ).addTo(group);
       }
     }
-  }, [
-    roads,
-    layer,
-    isBefore,
-    reference,
-    model,
-    selectedZone,
-  ]);
+  }, [roads, layer, isBefore, reference, model, selectedZone]);
 
   // ======================================
   // CANVAS VEHICLE ANIMATION
@@ -1347,9 +1076,7 @@ export default function ModelMap({
     let lastDraw = 0;
 
     const reducedMotion =
-      window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)"
-      )?.matches || false;
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || false;
 
     function drawFrame(time) {
       raf = requestAnimationFrame(drawFrame);
@@ -1359,33 +1086,18 @@ export default function ModelMap({
         return;
       }
 
-      const dt = clamp(
-        lastTime
-          ? (time - lastTime) / 1000
-          : 0,
-        0,
-        0.07
-      );
+      const dt = clamp(lastTime ? (time - lastTime) / 1000 : 0, 0, 0.07);
 
       lastTime = time;
       lastDraw = time;
 
       const size = map.getSize();
 
-      const dpr = Math.min(
-        2,
-        window.devicePixelRatio || 1
-      );
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
 
-      const width = Math.max(
-        1,
-        Math.round(size.x * dpr)
-      );
+      const width = Math.max(1, Math.round(size.x * dpr));
 
-      const height = Math.max(
-        1,
-        Math.round(size.y * dpr)
-      );
+      const height = Math.max(1, Math.round(size.y * dpr));
 
       if (canvas.width !== width) {
         canvas.width = width;
@@ -1398,21 +1110,9 @@ export default function ModelMap({
       canvas.style.width = `${size.x}px`;
       canvas.style.height = `${size.y}px`;
 
-      ctx.setTransform(
-        dpr,
-        0,
-        0,
-        dpr,
-        0,
-        0
-      );
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      ctx.clearRect(
-        0,
-        0,
-        size.x,
-        size.y
-      );
+      ctx.clearRect(0, 0, size.x, size.y);
 
       const settings = settingsRef.current;
 
@@ -1425,36 +1125,22 @@ export default function ModelMap({
 
       const after = !settings.isBefore;
 
-      if (
-        settings.playing &&
-        !reducedMotion
-      ) {
-        advanceVehicles(
-          vehicles,
-          scene,
-          dt,
-          after,
-          settings.reference
-        );
+      if (settings.playing && !reducedMotion) {
+        advanceVehicles(vehicles, scene, dt, after, settings.reference);
       }
 
-      const preset =
-        getVehiclePreset(map.getZoom());
+      const preset = getVehiclePreset(map.getZoom());
 
       // ==================================
       // DRAW VEHICLES
       // ==================================
 
       for (const car of vehicles) {
-        if (
-          car.state === "waiting" ||
-          car.sample > preset.visibility
-        ) {
+        if (car.state === "waiting" || car.sample > preset.visibility) {
           continue;
         }
 
-        const road =
-          scene.byId.get(car.roadId);
+        const road = scene.byId.get(car.roadId);
 
         if (!road) {
           continue;
@@ -1463,89 +1149,53 @@ export default function ModelMap({
         // Populasi After mengikuti
         // rasio arus di ruas yang sama.
 
-        const afterRatio = clamp(
-          road.after /
-            Math.max(1, road.before),
-          0,
-          1
-        );
+        const afterRatio = clamp(road.after / Math.max(1, road.before), 0, 1);
 
-        if (
-          after &&
-          car.afterSample > afterRatio
-        ) {
+        if (after && car.afterSample > afterRatio) {
           continue;
         }
 
-        const point = pointAlongRoad(
-          road,
-          car.distance
-        );
+        const point = pointAlongRoad(road, car.distance);
 
         // Koordinat posisi kendaraan,
         // arah, dan jalan diproyeksikan
         // oleh instance Leaflet yang sama.
 
-        const position =
-          map.latLngToContainerPoint([
-            point.lat,
-            point.lng,
-          ]);
+        const position = map.latLngToLayerPoint([point.lat, point.lng]);
 
-        const screenStart =
-          map.latLngToContainerPoint(
-            point.start
-          );
+        const screenStart = map.latLngToLayerPoint(point.start);
 
-        const screenEnd =
-          map.latLngToContainerPoint(
-            point.end
-          );
+        const screenEnd = map.latLngToLayerPoint(point.end);
 
-        const dx =
-          screenEnd.x - screenStart.x;
+        const dx = screenEnd.x - screenStart.x;
 
-        const dy =
-          screenEnd.y - screenStart.y;
+        const dy = screenEnd.y - screenStart.y;
 
-        const length =
-          Math.hypot(dx, dy);
+        const length = Math.hypot(dx, dy);
 
         if (length < 0.001) {
           continue;
         }
 
-        const angle =
-          Math.atan2(dy, dx);
+        const angle = Math.atan2(dy, dx);
 
         // Sisi kiri arah gerak.
         // Offset dinonaktifkan pada
         // zoom jauh dan sedang.
 
-        const offset =
-          preset.laneOffset;
+        const offset = preset.laneOffset;
 
-        const x =
-          position.x +
-          (dy / length) * offset;
+        const x = position.x + (dy / length) * offset;
 
-        const y =
-          position.y -
-          (dx / length) * offset;
+        const y = position.y - (dx / length) * offset;
 
-        if (
-          x < -30 ||
-          y < -30 ||
-          x > size.x + 30 ||
-          y > size.y + 30
-        ) {
+        if (x < -30 || y < -30 || x > size.x + 30 || y > size.y + 30) {
           continue;
         }
 
         ctx.save();
 
-        ctx.globalAlpha =
-          clamp(car.alpha, 0, 1);
+        ctx.globalAlpha = clamp(car.alpha, 0, 1);
 
         ctx.translate(x, y);
         ctx.rotate(angle);
@@ -1569,14 +1219,11 @@ export default function ModelMap({
 
   const resetView = useCallback(() => {
     mapRef.current?.setView(
-      [
-        INITIAL_VIEW.lat,
-        INITIAL_VIEW.lng,
-      ],
+      [INITIAL_VIEW.lat, INITIAL_VIEW.lng],
       INITIAL_VIEW.zoom,
       {
         animate: false,
-      }
+      },
     );
   }, []);
 
@@ -1612,10 +1259,10 @@ export default function ModelMap({
         ref={canvasRef}
         aria-hidden="true"
         className="
-          pointer-events-none
-          absolute inset-0
-          z-[450]
-        "
+    pointer-events-none
+    absolute inset-0
+    z-[450]
+  "
       />
 
       {/* MAP LAYERS */}
@@ -1680,9 +1327,7 @@ export default function ModelMap({
         <button
           type="button"
           aria-label="Perbesar peta"
-          onClick={() =>
-            mapRef.current?.zoomIn(0.5)
-          }
+          onClick={() => mapRef.current?.zoomIn(0.5)}
           className="
             grid h-10 w-10 place-items-center
             text-slate-700 hover:bg-slate-100
@@ -1696,9 +1341,7 @@ export default function ModelMap({
         <button
           type="button"
           aria-label="Perkecil peta"
-          onClick={() =>
-            mapRef.current?.zoomOut(0.5)
-          }
+          onClick={() => mapRef.current?.zoomOut(0.5)}
           className="
             grid h-10 w-10 place-items-center
             text-slate-700 hover:bg-slate-100
@@ -1732,9 +1375,7 @@ export default function ModelMap({
       >
         <button
           type="button"
-          onClick={() =>
-            setPlaying((value) => !value)
-          }
+          onClick={() => setPlaying((value) => !value)}
           className="
             flex items-center gap-2
             rounded-lg border border-slate-200
@@ -1743,11 +1384,7 @@ export default function ModelMap({
             text-slate-700 shadow-sm
           "
         >
-          {playing ? (
-            <Pause size={13} />
-          ) : (
-            <Play size={13} />
-          )}
+          {playing ? <Pause size={13} /> : <Play size={13} />}
 
           {playing ? "Jeda" : "Putar"}
         </button>
@@ -1767,8 +1404,7 @@ export default function ModelMap({
           text-slate-700 shadow-sm
         "
       >
-        {label ||
-          (isBefore ? "SEBELUM" : "SESUDAH")}
+        {label || (isBefore ? "SEBELUM" : "SESUDAH")}
       </span>
 
       {/* NO NETWORK */}
@@ -1785,8 +1421,8 @@ export default function ModelMap({
             text-slate-600 shadow-sm
           "
         >
-          Jaringan jalan Modeling belum tersedia.
-          Periksa koneksi OSRM atau data jaringan.
+          Jaringan jalan Modeling belum tersedia. Periksa koneksi OSRM atau data
+          jaringan.
         </div>
       )}
 
@@ -1800,13 +1436,12 @@ export default function ModelMap({
             z-[900]
             max-w-[250px]
             rounded-lg bg-white/95
-            px-3 py-2
+            px-3 apy-2
             text-[10px] text-slate-600
             shadow-sm
           "
         >
-          Garis OD menunjukkan hubungan
-          asal–tujuan, bukan lintasan mobil.
+          Garis OD menunjukkan hubungan asal–tujuan, bukan lintasan mobil.
         </div>
       )}
     </div>
