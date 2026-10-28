@@ -2,9 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
 import {
   Map as MapIcon,
   CarFront,
+  BusFront,
   Network,
   RotateCcw,
   Play,
@@ -14,24 +16,34 @@ import {
   SlidersHorizontal,
   Info,
 } from "lucide-react";
-import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
-import { addTmdNetworkLayer } from "../../data/tmdNetwork";
 
-/*
- * DENPASAR 2041 — SMOOTH TRAFFIC PREVIEW
- *
- * Khusus halaman Beranda.
- * Kendaraan dan heatmap menggunakan canvas di pane Leaflet.
- * Jaringan TMD ditampilkan melalui layer Leaflet tersendiri.
- *
- * Catatan:
- * - Kendaraan merupakan visualisasi ilustratif.
- * - Bus TMD bukan pelacakan GPS real-time.
- * - Hotspot MAT bukan pengukuran kemacetan aktual.
- */
+import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
+
+import {
+  addTmdNetworkLayer,
+  TMD_BOUNDS,
+  TMD_CORRIDORS,
+} from "../../data/tmdNetwork";
+
+// ======================================================
+// DEWATAMOVE 2041
+// SIMULATION PREVIEW — HOME
+//
+// - Leaflet + OpenStreetMap
+// - Jaringan Trans Metro Dewata
+// - Animasi kendaraan berbasis jaringan jalan
+// - MAT 13 zona
+// - Garis OD
+// - Visualisasi intensitas arus
+// - Mode Jaringan TMD saja
+// - Responsif dengan Tailwind
+//
+// Posisi bus TMD merupakan simulasi, bukan GPS aktual.
+// ======================================================
 
 const CITY = [-8.673, 115.216];
-const MAX_VEHICLES = 2100;
+
+const MAX_VEHICLES = 1800;
 const DEFAULT_DENSITY = 0.85;
 const MAX_DENSITY = 1.6;
 const SIMULATION_SPEED = 3.1;
@@ -41,32 +53,39 @@ const ROAD_SPEEDS = [
 ];
 
 const ROAD_CLASS_FACTOR = [
-  1.15, 1.1, 1.05, 1, 0.94, 0.88, 0.82, 0.76, 0.7,
+  1.15, 1.1, 1.05, 1,
+  0.94, 0.88, 0.82, 0.76, 0.7,
 ];
 
-const COLORS = [
-  "#ffffff",
-  "#e2e8f0",
+const VEHICLE_COLORS = [
+  "#FFFFFF",
+  "#E2E8F0",
   "#475569",
   "#334155",
-  "#b91c1c",
-  "#2563eb",
-  "#0f766e",
-  "#d9a024",
+  "#B91C1C",
+  "#2563EB",
+  "#0F766E",
+  "#D9A024",
 ];
 
-const clamp = (n, min, max) =>
-  Math.min(max, Math.max(min, n));
+const clamp = (value, min, max) =>
+  Math.max(min, Math.min(max, value));
 
-const formatNumber = (n) =>
-  Math.round(n || 0).toLocaleString("id-ID");
+const formatNumber = (value) =>
+  Math.round(value || 0).toLocaleString("id-ID");
 
-/*
- * RINGKASAN MAT 2026
- *
- * Mengukur bangkitan dan tarikan perjalanan,
- * bukan tingkat kemacetan atau V/C ruas jalan.
- */
+function hash(value) {
+  let x = Math.floor(value) | 0;
+
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+// ======================================================
+// MAT INSIGHTS
+// ======================================================
 
 function getZoneMatInsights(graph) {
   if (
@@ -78,59 +97,52 @@ function getZoneMatInsights(graph) {
   }
 
   const matrix = graph.mat;
-  const zones = graph.zones;
 
-  const rankedZones = zones.map(
-    (zone, fallbackIndex) => {
-      const indexFromId =
-        Number(String(zone.id).replace(/[^0-9]/g, "")) - 1;
+  const zones = graph.zones.map((zone, fallbackIndex) => {
+    const parsedIndex =
+      Number(String(zone.id).replace(/[^0-9]/g, "")) - 1;
 
-      const index =
-        Number.isInteger(indexFromId) &&
-        indexFromId >= 0 &&
-        indexFromId < matrix.length
-          ? indexFromId
-          : fallbackIndex;
+    const index =
+      Number.isInteger(parsedIndex) &&
+      parsedIndex >= 0 &&
+      parsedIndex < matrix.length
+        ? parsedIndex
+        : fallbackIndex;
 
-      const out = (matrix[index] || []).reduce(
-        (sum, value) => sum + (Number(value) || 0),
-        0
-      );
+    const out = (matrix[index] || []).reduce(
+      (sum, value) => sum + (Number(value) || 0),
+      0
+    );
 
-      const incoming = matrix.reduce(
-        (sum, row) =>
-          sum + (Number(row?.[index]) || 0),
-        0
-      );
+    const incoming = matrix.reduce(
+      (sum, row) => sum + (Number(row?.[index]) || 0),
+      0
+    );
 
-      const internal =
-        Number(matrix[index]?.[index]) || 0;
+    const internal = Number(matrix[index]?.[index]) || 0;
 
-      return {
-        ...zone,
-        index,
-        out,
-        incoming,
-        internal,
-        activity: out + incoming - internal,
-      };
-    }
-  );
+    return {
+      ...zone,
+      index,
+      out,
+      incoming,
+      internal,
+      activity: out + incoming - internal,
+    };
+  });
 
-  const byOrigin = [...rankedZones].sort(
-    (a, b) => b.out - a.out
-  );
+  const byOrigin = [...zones].sort((a, b) => b.out - a.out);
 
-  const byDestination = [...rankedZones].sort(
+  const byDestination = [...zones].sort(
     (a, b) => b.incoming - a.incoming
   );
 
-  const byActivity = [...rankedZones].sort(
+  const byActivity = [...zones].sort(
     (a, b) => b.activity - a.activity
   );
 
   const zoneByIndex = new Map(
-    rankedZones.map((zone) => [zone.index, zone])
+    zones.map((zone) => [zone.index, zone])
   );
 
   const odPairs = [];
@@ -179,20 +191,42 @@ function getZoneMatInsights(graph) {
   };
 }
 
-function hash(n) {
-  let x = Math.floor(n) | 0;
+// ======================================================
+// LEAFLET ZONE ICON
+// ======================================================
 
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-
-  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+function createZoneIcon(id, active) {
+  return L.divIcon({
+    className: "",
+    html: `
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:31px;
+        height:29px;
+        border-radius:9px;
+        background:${active ? "#B91C1C" : "#FFFFFF"};
+        color:${active ? "#FFFFFF" : "#334155"};
+        border:1px solid ${
+          active ? "#B91C1C" : "#CBD5E1"
+        };
+        font:700 10px system-ui;
+        box-shadow:0 2px 8px #0002;
+      ">
+        ${id}
+      </div>
+    `,
+    iconSize: [31, 29],
+    iconAnchor: [15, 14],
+  });
 }
 
-/*
- * UKURAN KENDARAAN BERDASARKAN ZOOM
- */
+// ======================================================
+// VEHICLE VISUALS
+// ======================================================
 
-function getVehicleScale(zoom) {
+function vehicleScale(zoom) {
   if (zoom <= 11) return 0.14;
   if (zoom <= 12) return 0.18;
   if (zoom <= 13) return 0.25;
@@ -204,7 +238,7 @@ function getVehicleScale(zoom) {
   return 1.12;
 }
 
-function getLaneGap(zoom) {
+function laneGap(zoom) {
   if (zoom <= 13) return 0;
   if (zoom <= 14) return 0.5;
   if (zoom <= 15) return 1.3;
@@ -214,76 +248,54 @@ function getLaneGap(zoom) {
   return 6;
 }
 
-function createZoneIcon(id, active) {
-  return L.divIcon({
-    className: "dt-zone-icon",
-    html: `
-      <span class="${active ? "active" : ""}">
-        ${id}
-      </span>
-    `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-  });
-}
-
-/*
- * GAMBAR KENDARAAN
- */
-
-function drawVehicle(ctx, car, scale) {
+function drawVehicle(ctx, vehicle, scale) {
   const s = scale;
 
-  if (car.type === "motor") {
-    ctx.fillStyle = "#17202e";
+  if (vehicle.type === "motor") {
+    ctx.fillStyle = "#17202E";
     ctx.fillRect(-5 * s, -1.5 * s, 10 * s, 3 * s);
 
-    ctx.fillStyle = car.color;
+    ctx.fillStyle = vehicle.color;
     ctx.fillRect(-2 * s, -1.8 * s, 4 * s, 3.6 * s);
-
     return;
   }
 
-  if (car.type === "bus") {
+  if (vehicle.type === "bus") {
     ctx.fillStyle = "#243244";
     ctx.fillRect(-11 * s, -4 * s, 22 * s, 8 * s);
 
-    ctx.fillStyle = "#f8fafc";
+    ctx.fillStyle = "#F8FAFC";
     ctx.fillRect(-10 * s, -3.2 * s, 20 * s, 6.4 * s);
 
-    ctx.fillStyle = "#334155";
-    ctx.fillRect(-6 * s, -2.3 * s, 12 * s, 3.8 * s);
-
-    ctx.fillStyle = "#b91c1c";
+    ctx.fillStyle = "#B91C1C";
     ctx.fillRect(-9 * s, 2 * s, 18 * s, 1 * s);
-
     return;
   }
 
-  // Mobil
-  ctx.fillStyle = "#1e293b";
+  ctx.fillStyle = "#1E293B";
   ctx.fillRect(-7 * s, -3.2 * s, 14 * s, 6.4 * s);
 
-  ctx.fillStyle = car.color;
+  ctx.fillStyle = vehicle.color;
   ctx.fillRect(-6.3 * s, -2.7 * s, 12.6 * s, 5.4 * s);
 
-  ctx.fillStyle = "#9bc5d8";
+  ctx.fillStyle = "#9BC5D8";
   ctx.fillRect(1.6 * s, -2.1 * s, 2.5 * s, 4.2 * s);
 }
 
-/*
- * MEMBUAT KENDARAAN
- */
+// ======================================================
+// CREATE VEHICLES
+// ======================================================
 
-function createCar(edgeIndex, index, count, edge) {
+function createVehicle(edgeIndex, index, count, edge) {
   const seed = edgeIndex * 997 + index * 73;
   const roadClass = clamp(edge[3] | 0, 0, 8);
+
   const roll = hash(seed);
 
   const type =
     roll < 0.67
       ? "motor"
-      : roll < (roadClass <= 4 ? 0.96 : 1)
+      : roll < 0.96
         ? "car"
         : "bus";
 
@@ -303,8 +315,8 @@ function createCar(edgeIndex, index, count, edge) {
     edge: edgeIndex,
     t: (index + 0.5) / count,
     type,
-    color: COLORS[
-      Math.floor(hash(seed + 3) * COLORS.length)
+    color: VEHICLE_COLORS[
+      Math.floor(hash(seed + 3) * VEHICLE_COLORS.length)
     ],
     length:
       type === "motor"
@@ -314,7 +326,6 @@ function createCar(edgeIndex, index, count, edge) {
           : 4.5,
     desiredSpeed,
     speed: desiredSpeed * 0.84,
-    headway: 1 + hash(seed + 27) * 0.7,
     minGap: 2 + hash(seed + 38) * 2,
     visibility: hash(seed + 823),
     seed,
@@ -323,9 +334,78 @@ function createCar(edgeIndex, index, count, edge) {
   };
 }
 
-/*
- * ARAH RUAS JALAN
- */
+function buildVehicles(graph) {
+  const p95 = Math.max(
+    1,
+    graph.metadata?.visualP95 || 1
+  );
+
+  const plans = [];
+  let totalExpected = 0;
+
+  graph.edges.forEach((edge, index) => {
+    if (edge[2] < 7) return;
+
+    const roadClass = clamp(edge[3] | 0, 0, 8);
+    const flow = Math.max(0, edge[4] || 0);
+
+    const relativeFlow = Math.pow(
+      clamp(flow / p95, 0, 3),
+      0.82
+    );
+
+    const demand =
+      (edge[2] / 1000) *
+      ROAD_CLASS_FACTOR[roadClass] *
+      (0.05 + 16.5 * relativeFlow) *
+      MAX_DENSITY;
+
+    const capacity = Math.max(
+      1,
+      Math.floor(edge[2] / (roadClass <= 3 ? 16 : 23))
+    );
+
+    const expected = Math.min(demand, capacity);
+
+    if (expected > 0) {
+      plans.push([index, expected]);
+      totalExpected += expected;
+    }
+  });
+
+  const factor = Math.min(
+    1,
+    MAX_VEHICLES / Math.max(1, totalExpected)
+  );
+
+  const cars = [];
+
+  for (const [index, expected] of plans) {
+    const amount = expected * factor;
+
+    const count =
+      Math.floor(amount) +
+      (hash(index * 31 + 9) < amount % 1 ? 1 : 0);
+
+    for (let i = 0; i < count; i++) {
+      cars.push(
+        createVehicle(index, i, count, graph.edges[index])
+      );
+    }
+  }
+
+  if (cars.length <= MAX_VEHICLES) return cars;
+
+  return Array.from(
+    { length: MAX_VEHICLES },
+    (_, i) =>
+      cars[Math.floor((i * cars.length) / MAX_VEHICLES)]
+  );
+}
+
+// ======================================================
+// ROAD CONNECTIONS
+// ======================================================
 
 function roadAngle(graph, edge) {
   const a = graph.nodes[edge[0]];
@@ -341,28 +421,18 @@ function roadAngle(graph, edge) {
   );
 }
 
-/*
- * MEMILIH JALAN BERIKUTNYA
- *
- * Kendaraan hanya memilih ruas yang tersambung.
- */
-
-function chooseNext(car, edge, graph, adjacency, flowIndex) {
+function chooseNextRoad(vehicle, edge, graph, adjacency) {
   const outgoing = adjacency[edge[1]] || [];
 
   if (!outgoing.length) return null;
 
   const noUTurn = outgoing.filter(
-    (i) => graph.edges[i][1] !== edge[0]
+    (index) => graph.edges[index][1] !== edge[0]
   );
 
   const choices = noUTurn.length ? noUTurn : outgoing;
-  const previousAngle = roadAngle(graph, edge);
 
-  const p95 = Math.max(
-    1,
-    graph.metadata?.visualP95 || 1
-  );
+  const currentAngle = roadAngle(graph, edge);
 
   let total = 0;
 
@@ -372,36 +442,35 @@ function chooseNext(car, edge, graph, adjacency, flowIndex) {
 
     const difference = Math.abs(
       Math.atan2(
-        Math.sin(angle - previousAngle),
-        Math.cos(angle - previousAngle)
+        Math.sin(angle - currentAngle),
+        Math.cos(angle - currentAngle)
       )
     );
 
-    const turnWeight =
+    const weight =
       difference < 0.45
         ? 3
         : difference < 1.3
           ? 1.5
           : 0.65;
 
-    const flow = Math.max(0, next[flowIndex] || 0);
-
-    total +=
-      turnWeight *
-      (0.8 + Math.min(1, Math.sqrt(flow / p95) * 0.6));
+    total += weight;
 
     return [index, total];
   });
 
-  car.seed += 37;
-
-  const roll = hash(car.seed) * total;
+  vehicle.seed += 37;
+  const roll = hash(vehicle.seed) * total;
 
   return (
-    weighted.find((item) => roll <= item[1])?.[0] ??
+    weighted.find(([index, value]) => roll <= value)?.[0] ??
     weighted[weighted.length - 1][0]
   );
 }
+
+// ======================================================
+// MAIN COMPONENT
+// ======================================================
 
 export default function SimulationPreview({
   initialScenario = "before",
@@ -409,8 +478,17 @@ export default function SimulationPreview({
 }) {
   const mapElement = useRef(null);
   const canvasElement = useRef(null);
+
   const mapRef = useRef(null);
   const tmdLayerRef = useRef(null);
+
+  const previousMapViewRef = useRef(null);
+
+  const zoneLayerRef = useRef(null);
+  const hotspotLayerRef = useRef(null);
+  const odLayerRef = useRef(null);
+
+  const redrawHeatRef = useRef(() => {});
 
   const sceneRef = useRef({
     graph: null,
@@ -419,21 +497,27 @@ export default function SimulationPreview({
     heatCanvas: null,
   });
 
-  const markersRef = useRef({});
-  const hotspotsRef = useRef(null);
-  const odLineRef = useRef(null);
-  const redrawHeatRef = useRef(() => {});
   const settingsRef = useRef({});
 
+  // DATA
   const [network, setNetwork] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // SIMULASI
   const [scenario, setScenario] = useState(initialScenario);
   const [density, setDensity] = useState(DEFAULT_DENSITY);
   const [playing, setPlaying] = useState(true);
+
+  // LAYER MAT
   const [showHeat, setShowHeat] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
   const [showOD, setShowOD] = useState(true);
+
+  // MODE TMD
+  const [networkOnly, setNetworkOnly] = useState(false);
+
+  // KONTROL
   const [mode, setMode] = useState("zones");
   const [origin, setOrigin] = useState("Z11");
   const [destination, setDestination] = useState("Z03");
@@ -445,24 +529,25 @@ export default function SimulationPreview({
     playing,
     showHeat,
     showHotspots,
+    networkOnly,
   };
 
   useEffect(() => {
     setScenario(initialScenario);
   }, [initialScenario]);
 
-  /*
-   * INISIALISASI LEAFLET + JARINGAN TMD
-   */
+  // ====================================================
+  // INITIALIZE LEAFLET
+  // ====================================================
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
 
     let disposed = false;
-    let frameId = null;
-    let observer = null;
-    let lastFrame = null;
+    let frameId = 0;
+    let lastFrame = 0;
     let lastCounter = 0;
+    let observer = null;
 
     const map = L.map(mapElement.current, {
       center: CITY,
@@ -474,7 +559,6 @@ export default function SimulationPreview({
       preferCanvas: true,
       zoomSnap: 0.5,
       zoomDelta: 0.5,
-      wheelPxPerZoomLevel: 120,
       zoomAnimation: false,
       fadeAnimation: false,
       markerZoomAnimation: false,
@@ -487,18 +571,16 @@ export default function SimulationPreview({
       {
         maxZoom: 19,
         attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          "© OpenStreetMap contributors",
       }
     ).addTo(map);
 
-    /*
-     * CANVAS KENDARAAN
-     *
-     * Pane 450 berada di bawah jaringan TMD (460),
-     * tetapi di atas overlay jalan standar Leaflet.
-     */
+    // ================================================
+    // CANVAS VEHICLE PANE
+    // ================================================
 
     const vehiclePane = map.createPane("dtVehiclePane");
+
     vehiclePane.style.zIndex = "450";
     vehiclePane.style.pointerEvents = "none";
 
@@ -509,75 +591,87 @@ export default function SimulationPreview({
     );
 
     vehicleCanvas.style.position = "absolute";
-    vehicleCanvas.style.left = "0px";
-    vehicleCanvas.style.top = "0px";
     vehicleCanvas.style.pointerEvents = "none";
 
     canvasElement.current = vehicleCanvas;
 
-    /*
-     * JARINGAN TRANS METRO DEWATA
-     *
-     * Menggunakan instance Leaflet yang sama dengan peta Beranda.
-     * Fungsi ini juga mengatur animasi bus ilustratif.
-     */
+    // ================================================
+    // TMD NETWORK
+    // ================================================
 
     tmdLayerRef.current = addTmdNetworkLayer(map, {
       animateBuses: true,
     });
 
-    /*
-     * RESIZE CANVAS
-     */
+    // ================================================
+    // RESIZE CANVAS
+    // ================================================
 
     function resizeCanvas() {
       const canvas = canvasElement.current;
       if (!canvas) return;
 
       const size = map.getSize();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
+      const dpr = Math.min(
+        window.devicePixelRatio || 1,
+        1.8
+      );
 
-      const width = Math.max(1, Math.round(size.x * dpr));
-      const height = Math.max(1, Math.round(size.y * dpr));
+      const width = Math.max(
+        1,
+        Math.round(size.x * dpr)
+      );
 
-      if (canvas.width !== width) canvas.width = width;
-      if (canvas.height !== height) canvas.height = height;
+      const height = Math.max(
+        1,
+        Math.round(size.y * dpr)
+      );
+
+      if (canvas.width !== width) {
+        canvas.width = width;
+      }
+
+      if (canvas.height !== height) {
+        canvas.height = height;
+      }
 
       canvas.style.width = `${size.x}px`;
       canvas.style.height = `${size.y}px`;
 
-      // Menjaga canvas menutup area viewport Leaflet.
-      const layerOrigin = map.containerPointToLayerPoint([0, 0]);
+      const offset = map.containerPointToLayerPoint([0, 0]);
 
-      canvas.style.left = `${layerOrigin.x}px`;
-      canvas.style.top = `${layerOrigin.y}px`;
+      canvas.style.left = `${offset.x}px`;
+      canvas.style.top = `${offset.y}px`;
     }
 
-    /*
-     * HEATMAP
-     *
-     * Nilai arus model divisualisasikan pada canvas.
-     * Kendaraan tidak dibuat ulang saat zoom.
-     */
+    // ================================================
+    // HEATMAP
+    // ================================================
 
     function paintHeat() {
-      const sc = sceneRef.current;
-      const graph = sc.graph;
+      const graph = sceneRef.current.graph;
 
-      if (!graph || !settingsRef.current.showHeat) {
-        sc.heatCanvas = null;
+      if (
+        !graph ||
+        !settingsRef.current.showHeat ||
+        settingsRef.current.networkOnly
+      ) {
+        sceneRef.current.heatCanvas = null;
         return;
       }
 
       const size = map.getSize();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
+      const dpr = Math.min(
+        window.devicePixelRatio || 1,
+        1.8
+      );
 
-      const off = document.createElement("canvas");
+      const offscreen = document.createElement("canvas");
 
-      off.width = Math.round(size.x * dpr);
-      off.height = Math.round(size.y * dpr);
+      offscreen.width = Math.round(size.x * dpr);
+      offscreen.height = Math.round(size.y * dpr);
 
-      const ctx = off.getContext("2d");
+      const ctx = offscreen.getContext("2d");
       if (!ctx) return;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -585,7 +679,9 @@ export default function SimulationPreview({
       const bounds = map.getBounds().pad(0.08);
 
       const flowIndex =
-        settingsRef.current.scenario === "after" ? 5 : 4;
+        settingsRef.current.scenario === "after"
+          ? 5
+          : 4;
 
       const p95 = Math.max(
         1,
@@ -596,6 +692,8 @@ export default function SimulationPreview({
         const a = graph.nodes[edge[0]];
         const b = graph.nodes[edge[1]];
 
+        if (!a || !b) continue;
+
         if (
           Math.max(a[0], b[0]) < bounds.getSouth() ||
           Math.min(a[0], b[0]) > bounds.getNorth() ||
@@ -605,7 +703,11 @@ export default function SimulationPreview({
           continue;
         }
 
-        const flow = Math.max(0, edge[flowIndex] || 0);
+        const flow = Math.max(
+          0,
+          edge[flowIndex] || 0
+        );
+
         if (!flow) continue;
 
         const p = map.latLngToContainerPoint(a);
@@ -622,7 +724,11 @@ export default function SimulationPreview({
               ? "rgba(234,117,31,.38)"
               : "rgba(234,179,8,.23)";
 
-        ctx.lineWidth = clamp(1 + strength * 2.3, 1, 5);
+        ctx.lineWidth = clamp(
+          1 + strength * 2.3,
+          1,
+          5
+        );
 
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
@@ -630,151 +736,53 @@ export default function SimulationPreview({
         ctx.stroke();
       }
 
-      sc.heatCanvas = off;
+      sceneRef.current.heatCanvas = offscreen;
     }
 
     redrawHeatRef.current = paintHeat;
 
-    /*
-     * KENDARAAN DIBUAT SEKALI
-     */
-
-    function initializeCars(graph) {
-      const p95 = Math.max(
-        1,
-        graph.metadata?.visualP95 || 1
-      );
-
-      const plans = [];
-      let totalExpected = 0;
-
-      for (let i = 0; i < graph.edges.length; i++) {
-        const edge = graph.edges[i];
-
-        if (edge[2] < 7) continue;
-
-        const roadClass = clamp(edge[3] | 0, 0, 8);
-        const flow = Math.max(0, edge[4] || 0);
-
-        const relativeFlow = Math.pow(
-          clamp(flow / p95, 0, 3),
-          0.82
-        );
-
-        const demand =
-          (edge[2] / 1000) *
-          ROAD_CLASS_FACTOR[roadClass] *
-          (0.05 + 16.5 * relativeFlow) *
-          MAX_DENSITY;
-
-        const capacity = Math.max(
-          1,
-          Math.floor(
-            edge[2] / (roadClass <= 3 ? 16 : 23)
-          )
-        );
-
-        const expected = Math.min(demand, capacity);
-
-        if (expected > 0) {
-          plans.push([i, expected]);
-          totalExpected += expected;
-        }
-      }
-
-      const factor = Math.min(
-        1,
-        MAX_VEHICLES / Math.max(1, totalExpected)
-      );
-
-      const cars = [];
-
-      for (const [index, expected] of plans) {
-        const amount = expected * factor;
-
-        const count =
-          Math.floor(amount) +
-          (hash(index * 31 + 9) < amount % 1 ? 1 : 0);
-
-        for (let n = 0; n < count; n++) {
-          cars.push(
-            createCar(
-              index,
-              n,
-              count,
-              graph.edges[index]
-            )
-          );
-        }
-      }
-
-      sceneRef.current.cars =
-        cars.length <= MAX_VEHICLES
-          ? cars
-          : Array.from(
-              { length: MAX_VEHICLES },
-              (_, i) =>
-                cars[
-                  Math.floor(
-                    i * cars.length / MAX_VEHICLES
-                  )
-                ]
-            );
-    }
-
-    /*
-     * GERAK KENDARAAN
-     *
-     * Kendaraan mengikuti ruas yang tersambung.
-     * Kecepatan simulasi tidak bergantung pada zoom.
-     */
+    // ================================================
+    // ANIMATE TRAFFIC
+    // ================================================
 
     function simulate(dt) {
-      const sc = sceneRef.current;
-      const graph = sc.graph;
+      const scene = sceneRef.current;
+      const graph = scene.graph;
 
       if (!graph || dt <= 0) return;
 
-      const flowIndex =
-        settingsRef.current.scenario === "after" ? 5 : 4;
-
       const occupied = new Map();
 
-      for (const car of sc.cars) {
-        if (car.status !== "moving") continue;
+      for (const vehicle of scene.cars) {
+        if (vehicle.status !== "moving") continue;
 
-        if (!occupied.has(car.edge)) {
-          occupied.set(car.edge, []);
+        if (!occupied.has(vehicle.edge)) {
+          occupied.set(vehicle.edge, []);
         }
 
-        occupied.get(car.edge).push({
-          car,
-          position: car.t,
-        });
+        occupied.get(vehicle.edge).push(vehicle);
       }
 
       for (const group of occupied.values()) {
-        group.sort((a, b) => b.position - a.position);
-      }
+        group.sort((a, b) => b.t - a.t);
 
-      for (const group of occupied.values()) {
         for (let i = 0; i < group.length; i++) {
-          const car = group[i].car;
-          let edge = graph.edges[car.edge];
+          const vehicle = group[i];
+          let edge = graph.edges[vehicle.edge];
 
           if (!edge) continue;
 
           const length = Math.max(edge[2], 0.5);
-          let targetSpeed = car.desiredSpeed;
+
+          let targetSpeed = vehicle.desiredSpeed;
 
           if (i > 0) {
             const leader = group[i - 1];
 
             const gap =
-              (leader.position - group[i].position) *
-              length -
-              leader.car.length -
-              car.minGap;
+              (leader.t - vehicle.t) * length -
+              leader.length -
+              vehicle.minGap;
 
             const safeSpeed = Math.sqrt(
               Math.max(0, 2 * 2.5 * gap)
@@ -786,119 +794,122 @@ export default function SimulationPreview({
             );
           }
 
-          const distanceToEnd = (1 - car.t) * length;
-          const exits = sc.adjacency[edge[1]] || [];
-
-          if (exits.length > 2 && distanceToEnd < 18) {
-            targetSpeed = Math.min(
-              targetSpeed,
-              7 + (distanceToEnd / 18) * 5
-            );
-          }
-
           const acceleration = clamp(
-            (targetSpeed - car.speed) * 1.8,
+            (targetSpeed - vehicle.speed) * 1.8,
             -4,
             2.4
           );
 
-          car.speed = clamp(
-            car.speed + acceleration * dt,
+          vehicle.speed = clamp(
+            vehicle.speed + acceleration * dt,
             0,
-            car.desiredSpeed
+            vehicle.desiredSpeed
           );
 
-          let travel = car.speed * dt;
+          let distance = vehicle.speed * dt;
 
           for (
-            let hops = 0;
-            travel > 0.0001 && hops < 16;
-            hops++
+            let hop = 0;
+            hop < 12 && distance > 0.0001;
+            hop++
           ) {
-            const roadLength = Math.max(edge[2], 0.5);
-            const remaining = (1 - car.t) * roadLength;
+            const edgeLength = Math.max(edge[2], 0.5);
 
-            if (travel < remaining) {
-              car.t += travel / roadLength;
-              travel = 0;
+            const remaining =
+              (1 - vehicle.t) * edgeLength;
+
+            if (distance < remaining) {
+              vehicle.t += distance / edgeLength;
+              distance = 0;
               break;
             }
 
-            travel -= remaining;
+            distance -= remaining;
 
-            const next = chooseNext(
-              car,
+            const next = chooseNextRoad(
+              vehicle,
               edge,
               graph,
-              sc.adjacency,
-              flowIndex
+              scene.adjacency
             );
 
             if (next == null) {
-              car.t = 0.9999;
-              car.speed = 0;
-              car.status = "exiting";
-              travel = 0;
+              vehicle.t = 0.9999;
+              vehicle.status = "exiting";
+              vehicle.speed = 0;
+              distance = 0;
               break;
             }
 
-            car.edge = next;
-            car.t = 0;
+            vehicle.edge = next;
+            vehicle.t = 0;
             edge = graph.edges[next];
           }
 
-          car.t = clamp(car.t, 0, 0.9999);
+          vehicle.t = clamp(
+            vehicle.t,
+            0,
+            0.9999
+          );
         }
       }
 
-      for (const car of sc.cars) {
-        if (car.status === "exiting") {
-          car.opacity = Math.max(
-            0,
-            car.opacity - dt * 1.2
-          );
+      for (const vehicle of scene.cars) {
+        if (vehicle.status !== "exiting") continue;
 
-          if (car.opacity <= 0) {
-            car.status = "finished";
-          }
+        vehicle.opacity = Math.max(
+          0,
+          vehicle.opacity - dt * 1.2
+        );
+
+        if (vehicle.opacity <= 0) {
+          vehicle.status = "finished";
         }
       }
     }
 
-    /*
-     * GAMBAR FRAME
-     */
+    // ================================================
+    // DRAW VEHICLES
+    // ================================================
 
     function draw() {
-      const sc = sceneRef.current;
-      const graph = sc.graph;
       const canvas = canvasElement.current;
+      const graph = sceneRef.current.graph;
 
-      if (!graph || !canvas) return 0;
+      if (!canvas) return 0;
 
-      /*
-       * Canvas berada di dalam pane Leaflet.
-       * Offset ini mengompensasi pergeseran pane ketika pan.
-       * Gambar tetap memakai koordinat container.
-       */
+      const offset = map.containerPointToLayerPoint([0, 0]);
 
-      const layerOrigin = map.containerPointToLayerPoint([0, 0]);
-
-      canvas.style.left = `${layerOrigin.x}px`;
-      canvas.style.top = `${layerOrigin.y}px`;
+      canvas.style.left = `${offset.x}px`;
+      canvas.style.top = `${offset.y}px`;
 
       const ctx = canvas.getContext("2d");
       if (!ctx) return 0;
 
       const size = map.getSize();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.8);
+
+      const dpr = Math.min(
+        window.devicePixelRatio || 1,
+        1.8
+      );
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size.x, size.y);
 
-      if (settingsRef.current.showHeat && sc.heatCanvas) {
+      // MODE JARINGAN TMD SAJA
+      // Hilangkan heatmap dan semua kendaraan MAT.
+      if (settingsRef.current.networkOnly) {
+        return 0;
+      }
+
+      if (!graph) return 0;
+
+      if (
+        settingsRef.current.showHeat &&
+        sceneRef.current.heatCanvas
+      ) {
         ctx.drawImage(
-          sc.heatCanvas,
+          sceneRef.current.heatCanvas,
           0,
           0,
           size.x,
@@ -907,58 +918,61 @@ export default function SimulationPreview({
       }
 
       const zoom = map.getZoom();
-      const scale = getVehicleScale(zoom);
-      const laneGap = getLaneGap(zoom);
+      const scale = vehicleScale(zoom);
+      const gap = laneGap(zoom);
 
       const threshold =
         settingsRef.current.density / MAX_DENSITY;
 
       const projectCache = new Map();
+
       let count = 0;
 
-      for (const car of sc.cars) {
+      for (const vehicle of sceneRef.current.cars) {
         if (
-          car.status === "finished" ||
-          car.visibility > threshold ||
-          car.opacity <= 0
+          vehicle.status === "finished" ||
+          vehicle.opacity <= 0 ||
+          vehicle.visibility > threshold
         ) {
           continue;
         }
 
-        let points = projectCache.get(car.edge);
+        let points = projectCache.get(vehicle.edge);
 
         if (!points) {
-          const edge = graph.edges[car.edge];
+          const edge = graph.edges[vehicle.edge];
+
           if (!edge) continue;
 
-          const a = map.latLngToContainerPoint(
-            graph.nodes[edge[0]]
-          );
+          const p = graph.nodes[edge[0]];
+          const q = graph.nodes[edge[1]];
 
-          const b = map.latLngToContainerPoint(
-            graph.nodes[edge[1]]
-          );
+          if (!p || !q) continue;
+
+          const a = map.latLngToContainerPoint(p);
+          const b = map.latLngToContainerPoint(q);
 
           points = [a.x, a.y, b.x, b.y];
-          projectCache.set(car.edge, points);
+
+          projectCache.set(vehicle.edge, points);
         }
 
         const dx = points[2] - points[0];
         const dy = points[3] - points[1];
+
         const length = Math.hypot(dx, dy);
 
         if (length < 0.01) continue;
 
-        // Posisi kendaraan di sisi kiri jalan.
         const x =
           points[0] +
-          dx * car.t +
-          (dy / length) * laneGap;
+          dx * vehicle.t +
+          (dy / length) * gap;
 
         const y =
           points[1] +
-          dy * car.t -
-          (dx / length) * laneGap;
+          dy * vehicle.t -
+          (dx / length) * gap;
 
         if (
           x < -20 ||
@@ -970,7 +984,7 @@ export default function SimulationPreview({
         }
 
         ctx.save();
-        ctx.globalAlpha = car.opacity;
+        ctx.globalAlpha = vehicle.opacity;
 
         if (zoom <= 13) {
           const radius =
@@ -980,7 +994,7 @@ export default function SimulationPreview({
                 ? 1.05
                 : 1.35;
 
-          ctx.fillStyle = car.color;
+          ctx.fillStyle = vehicle.color;
           ctx.strokeStyle = "#334155";
           ctx.lineWidth = 0.35;
 
@@ -991,7 +1005,8 @@ export default function SimulationPreview({
         } else {
           ctx.translate(x, y);
           ctx.rotate(Math.atan2(dy, dx));
-          drawVehicle(ctx, car, scale);
+
+          drawVehicle(ctx, vehicle, scale);
         }
 
         ctx.restore();
@@ -1001,32 +1016,29 @@ export default function SimulationPreview({
       return count;
     }
 
-    /*
-     * LOOP ANIMASI
-     */
+    // ================================================
+    // ANIMATION FRAME
+    // ================================================
 
     function frame(now) {
       if (disposed) return;
 
-      const dt =
-        lastFrame == null
-          ? 0
-          : clamp(
-              (now - lastFrame) / 1000,
-              0,
-              0.06
-            );
+      const dt = lastFrame
+        ? clamp((now - lastFrame) / 1000, 0, 0.06)
+        : 0;
 
       lastFrame = now;
 
       if (
         settingsRef.current.playing &&
-        sceneRef.current.graph
+        sceneRef.current.graph &&
+        !settingsRef.current.networkOnly
       ) {
         let remaining = dt * SIMULATION_SPEED;
 
         while (remaining > 0.0001) {
           const step = Math.min(remaining, 0.065);
+
           simulate(step);
           remaining -= step;
         }
@@ -1042,9 +1054,9 @@ export default function SimulationPreview({
       frameId = requestAnimationFrame(frame);
     }
 
-    /*
-     * ZOOM / PAN
-     */
+    // ================================================
+    // MAP RESIZE / VIEW CHANGES
+    // ================================================
 
     function viewportChanged() {
       resizeCanvas();
@@ -1068,9 +1080,9 @@ export default function SimulationPreview({
 
     resizeCanvas();
 
-    /*
-     * MEMUAT JARINGAN JALAN OSM
-     */
+    // ================================================
+    // LOAD ROAD NETWORK
+    // ================================================
 
     (async () => {
       try {
@@ -1093,19 +1105,19 @@ export default function SimulationPreview({
           () => []
         );
 
-        graph.edges.forEach((edge, i) => {
-          adjacency[edge[0]].push(i);
+        graph.edges.forEach((edge, index) => {
+          if (adjacency[edge[0]]) {
+            adjacency[edge[0]].push(index);
+          }
         });
 
         sceneRef.current.graph = graph;
         sceneRef.current.adjacency = adjacency;
+        sceneRef.current.cars = buildVehicles(graph);
 
-        initializeCars(graph);
-
-        /*
-         * Zona berwarna menurut aktivitas perjalanan MAT.
-         * Bukan peta kemacetan aktual.
-         */
+        // ============================================
+        // MAT ZONE CIRCLES
+        // ============================================
 
         const insights = getZoneMatInsights(graph);
 
@@ -1115,97 +1127,114 @@ export default function SimulationPreview({
             insights.byActivity[0]?.activity || 1
           );
 
-          const topOrigins = new Set(
+          const origins = new Set(
             insights.byOrigin.slice(0, 2).map((z) => z.id)
           );
 
-          const topDestinations = new Set(
+          const destinations = new Set(
             insights.byDestination.slice(0, 2).map((z) => z.id)
           );
 
           const group = L.layerGroup();
 
-          insights.byActivity.forEach((z) => {
-            const priorityOrigin = topOrigins.has(z.id);
+          insights.byActivity.forEach((zone) => {
+            const priorityOrigin = origins.has(zone.id);
             const priorityDestination =
-              topDestinations.has(z.id);
+              destinations.has(zone.id);
 
             const color = priorityDestination
-              ? "#2563eb"
+              ? "#2563EB"
               : priorityOrigin
-                ? "#dc2626"
-                : "#f59e0b";
+                ? "#DC2626"
+                : "#F59E0B";
 
             const radius =
-              9 + 20 * Math.sqrt(z.activity / maxActivity);
+              9 +
+              20 * Math.sqrt(zone.activity / maxActivity);
 
-            L.circleMarker([z.lat, z.lng], {
-              radius,
-              color,
-              weight:
-                priorityOrigin || priorityDestination ? 2 : 1,
-              opacity: 0.8,
-              fillColor: color,
-              fillOpacity:
-                priorityOrigin || priorityDestination
-                  ? 0.15
-                  : 0.07,
-              interactive: true,
-            })
+            L.circleMarker(
+              [zone.lat, zone.lng],
+              {
+                radius,
+                color,
+                weight: 1.5,
+                opacity: 0.8,
+                fillColor: color,
+                fillOpacity: 0.12,
+              }
+            )
               .bindTooltip(
-                `<b>${z.id} · ${z.name}</b><br/>Bangkitan: ${formatNumber(z.out)} smp/jam` +
-                `<br/>Tarikan: ${formatNumber(z.incoming)} smp/jam` +
-                `<br/><small>Aktivitas MAT, bukan tingkat macet ruas</small>`,
-                { sticky: true, opacity: 0.95 }
+                `<b>${zone.id} · ${zone.name}</b>` +
+                `<div>Bangkitan: ${formatNumber(zone.out)} smp/jam</div>` +
+                `<div>Tarikan: ${formatNumber(zone.incoming)} smp/jam</div>`
               )
               .addTo(group);
           });
 
-          hotspotsRef.current = group;
+          hotspotLayerRef.current = group;
 
-          if (settingsRef.current.showHotspots) {
+          if (
+            settingsRef.current.showHotspots &&
+            !settingsRef.current.networkOnly
+          ) {
             group.addTo(map);
           }
         }
 
+        // ============================================
+        // MAT ZONE MARKERS Z01-Z13
+        // ============================================
+
+        const zoneLayer = L.layerGroup();
+
         for (const zone of graph.zones || []) {
-          const marker = L.marker(
+          L.marker(
             [zone.lat, zone.lng],
             {
               icon: createZoneIcon(zone.id, false),
               title: `${zone.id} - ${zone.name}`,
             }
-          ).addTo(map);
+          )
+            .bindTooltip(`${zone.id} - ${zone.name}`)
+            .on("click", () => setOrigin(zone.id))
+            .addTo(zoneLayer);
+        }
 
-          marker.bindTooltip(
-            `${zone.id} - ${zone.name}`
-          );
+        zoneLayerRef.current = zoneLayer;
 
-          marker.on("click", () => {
-            setOrigin(zone.id);
-          });
-
-          markersRef.current[zone.id] = marker;
+        if (!settingsRef.current.networkOnly) {
+          zoneLayer.addTo(map);
         }
 
         setNetwork(graph);
         setLoading(false);
         setError("");
 
-        map.fitBounds(
-          graph.zones.map((z) => [z.lat, z.lng]),
-          {
-            padding: [35, 35],
-            maxZoom: 12,
+        if (settingsRef.current.networkOnly) {
+          map.fitBounds(TMD_BOUNDS, {
+            padding: [26, 26],
+            maxZoom: 11,
             animate: false,
-          }
-        );
+          });
+        } else {
+          map.fitBounds(
+            graph.zones.map((zone) => [
+              zone.lat,
+              zone.lng,
+            ]),
+            {
+              padding: [35, 35],
+              maxZoom: 12,
+              animate: false,
+            }
+          );
+        }
 
         viewportChanged();
       } catch (err) {
         if (disposed) return;
 
-        console.error("[Denpasar]", err);
+        console.error("[DewataMove]", err);
 
         setError(
           "Jaringan jalan gagal dimuat: " + err.message
@@ -1217,10 +1246,14 @@ export default function SimulationPreview({
 
     frameId = requestAnimationFrame(frame);
 
+    // ================================================
+    // CLEANUP
+    // ================================================
+
     return () => {
       disposed = true;
 
-      if (frameId != null) {
+      if (frameId) {
         cancelAnimationFrame(frameId);
       }
 
@@ -1229,7 +1262,6 @@ export default function SimulationPreview({
       map.off("zoomend moveend", viewportChanged);
       map.off("zoom", draw);
 
-      // Hentikan animasi bus dan lepaskan layer TMD.
       tmdLayerRef.current?.destroy?.();
       tmdLayerRef.current = null;
 
@@ -1238,9 +1270,10 @@ export default function SimulationPreview({
       map.remove();
       mapRef.current = null;
 
-      markersRef.current = {};
-      hotspotsRef.current = null;
-      odLineRef.current = null;
+      zoneLayerRef.current = null;
+      hotspotLayerRef.current = null;
+      odLayerRef.current = null;
+
       redrawHeatRef.current = () => {};
 
       sceneRef.current = {
@@ -1252,67 +1285,70 @@ export default function SimulationPreview({
     };
   }, []);
 
-  /*
-   * UPDATE HEATMAP TANPA RESET MOBIL
-   */
+  // ====================================================
+  // UPDATE HEATMAP
+  // ====================================================
 
   useEffect(() => {
     redrawHeatRef.current();
-  }, [showHeat, scenario]);
+  }, [showHeat, scenario, networkOnly]);
 
-  /*
-   * MENAMPILKAN / MENYEMBUNYIKAN HOTSPOT MAT
-   */
+  // ====================================================
+  // SHOW / HIDE MAT ZONE AND HOTSPOTS
+  // ====================================================
 
   useEffect(() => {
     const map = mapRef.current;
-    const circles = hotspotsRef.current;
+    if (!map) return;
 
-    if (!map || !circles) return;
+    const zoneLayer = zoneLayerRef.current;
+    const hotspotLayer = hotspotLayerRef.current;
 
-    if (showHotspots && !map.hasLayer(circles)) {
-      circles.addTo(map);
+    if (zoneLayer) {
+      if (networkOnly) {
+        if (map.hasLayer(zoneLayer)) {
+          map.removeLayer(zoneLayer);
+        }
+      } else if (!map.hasLayer(zoneLayer)) {
+        zoneLayer.addTo(map);
+      }
     }
 
-    if (!showHotspots && map.hasLayer(circles)) {
-      map.removeLayer(circles);
-    }
-  }, [showHotspots, network]);
+    if (hotspotLayer) {
+      const visible = showHotspots && !networkOnly;
 
-  /*
-   * GARIS KEINGINAN PERJALANAN (DESIRE LINES)
-   *
-   * Garis OD bukan rute jalan.
-   */
+      if (visible && !map.hasLayer(hotspotLayer)) {
+        hotspotLayer.addTo(map);
+      }
+
+      if (!visible && map.hasLayer(hotspotLayer)) {
+        map.removeLayer(hotspotLayer);
+      }
+    }
+  }, [network, networkOnly, showHotspots]);
+
+  // ====================================================
+  // SHOW / HIDE OD LAYER
+  // ====================================================
 
   useEffect(() => {
     const map = mapRef.current;
 
     if (!map || !network) return;
 
-    if (odLineRef.current) {
-      map.removeLayer(odLineRef.current);
-      odLineRef.current = null;
+    if (odLayerRef.current) {
+      map.removeLayer(odLayerRef.current);
+      odLayerRef.current = null;
     }
 
-    for (const zone of network.zones) {
-      markersRef.current[zone.id]?.setIcon(
-        createZoneIcon(
-          zone.id,
-          zone.id === origin || zone.id === destination
-        )
-      );
-    }
-
-    if (!showOD) return;
+    if (!showOD || networkOnly) return;
 
     const group = L.layerGroup();
     const insights = getZoneMatInsights(network);
 
-    const strongestPairs =
-      insights?.odPairs.slice(0, 5) || [];
+    const strongestPairs = insights?.odPairs.slice(0, 5) || [];
 
-    const biggestOD = Math.max(
+    const maximum = Math.max(
       1,
       strongestPairs[0]?.value || 1
     );
@@ -1328,27 +1364,27 @@ export default function SimulationPreview({
           [pair.destination.lat, pair.destination.lng],
         ],
         {
-          color: selected ? "#b91c1c" : "#f97316",
+          color: selected ? "#B91C1C" : "#F97316",
           weight:
-            1.5 + 4 * Math.sqrt(pair.value / biggestOD),
+            1.5 +
+            4 * Math.sqrt(pair.value / maximum),
           opacity: selected ? 0.72 : 0.28,
-          dashArray: selected ? "" : "5 10",
-          interactive: true,
+          dashArray: selected ? null : "5 10",
         }
       )
         .bindTooltip(
-          `${pair.origin.id} → ${pair.destination.id}: ${formatNumber(pair.value)} smp/jam (MAT)`,
-          { sticky: true }
+          `${pair.origin.id} → ${pair.destination.id}: ` +
+          `${formatNumber(pair.value)} smp/jam`
         )
         .addTo(group);
     }
 
     const a = network.zones.find(
-      (z) => z.id === origin
+      (zone) => zone.id === origin
     );
 
     const b = network.zones.find(
-      (z) => z.id === destination
+      (zone) => zone.id === destination
     );
 
     if (a && b) {
@@ -1358,32 +1394,71 @@ export default function SimulationPreview({
           [b.lat, b.lng],
         ],
         {
-          color: "#b91c1c",
-          weight: 3.5,
-          opacity: 0.92,
+          color: "#B91C1C",
+          weight: 3,
           dashArray: "8 6",
+          opacity: 0.85,
           interactive: false,
         }
       ).addTo(group);
     }
 
     group.addTo(map);
-    odLineRef.current = group;
-  }, [origin, destination, showOD, network]);
+    odLayerRef.current = group;
+  }, [network, origin, destination, showOD, networkOnly]);
 
-  /*
-   * TOMBOL PETA
-   */
+  // ====================================================
+  // MAP ACTIONS
+  // ====================================================
+
+  function toggleNetworkOnly() {
+    const map = mapRef.current;
+
+    if (!networkOnly) {
+      if (map) {
+        previousMapViewRef.current = {
+          center: map.getCenter(),
+          zoom: map.getZoom(),
+        };
+
+        map.fitBounds(TMD_BOUNDS, {
+          padding: [26, 26],
+          maxZoom: 11,
+          animate: false,
+        });
+      }
+
+      setNetworkOnly(true);
+      setMode("tmd");
+    } else {
+      const previous = previousMapViewRef.current;
+
+      if (map && previous) {
+        map.setView(
+          previous.center,
+          previous.zoom,
+          { animate: false }
+        );
+      }
+
+      setNetworkOnly(false);
+      setMode("zones");
+    }
+  }
 
   function showAllZones() {
     const map = mapRef.current;
 
+    setNetworkOnly(false);
     setMode("zones");
 
     if (!map || !network?.zones?.length) return;
 
     map.fitBounds(
-      network.zones.map((z) => [z.lat, z.lng]),
+      network.zones.map((zone) => [
+        zone.lat,
+        zone.lng,
+      ]),
       {
         padding: [35, 35],
         maxZoom: 12,
@@ -1393,6 +1468,7 @@ export default function SimulationPreview({
   }
 
   function focusStreet() {
+    setNetworkOnly(false);
     setMode("street");
 
     mapRef.current?.setView(
@@ -1403,6 +1479,7 @@ export default function SimulationPreview({
   }
 
   function reset() {
+    setNetworkOnly(false);
     setDensity(DEFAULT_DENSITY);
     setScenario(initialScenario);
     setPlaying(true);
@@ -1415,9 +1492,9 @@ export default function SimulationPreview({
     showAllZones();
   }
 
-  /*
-   * DATA MAT
-   */
+  // ====================================================
+  // MAT DATA
+  // ====================================================
 
   const zones = network?.zones || [];
 
@@ -1426,17 +1503,17 @@ export default function SimulationPreview({
     [network]
   );
 
-  const oi = zones.findIndex(
-    (z) => z.id === origin
+  const originIndex = zones.findIndex(
+    (zone) => zone.id === origin
   );
 
-  const di = zones.findIndex(
-    (z) => z.id === destination
+  const destinationIndex = zones.findIndex(
+    (zone) => zone.id === destination
   );
 
   const od =
-    oi >= 0 && di >= 0
-      ? network.mat[oi][di]
+    originIndex >= 0 && destinationIndex >= 0
+      ? network?.mat?.[originIndex]?.[destinationIndex]
       : null;
 
   const reduction =
@@ -1451,89 +1528,49 @@ export default function SimulationPreview({
         ? od * (1 - reduction)
         : od;
 
-  const afterTotal = network?.mat.reduce(
-    (total, row, i) =>
-      total +
+  const afterTotal = network?.mat?.reduce(
+    (sum, row, i) =>
+      sum +
       row.reduce(
-        (sum, value, j) =>
-          sum +
+        (acc, value, j) =>
+          acc +
           value *
-          (1 - (i === 10 && j === 2 ? 0.3 : 0.12)),
+            (1 - (i === 10 && j === 2 ? 0.3 : 0.12)),
         0
       ),
     0
   );
 
+  // ====================================================
+  // RENDER
+  // ====================================================
+
   return (
-    <div className="mx-auto w-full max-w-[1450px] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg sm:rounded-3xl sm:p-3">
-      <style>{`
-        .dt-map {
-          width: 100%;
-          height: 100%;
-          background: #edf1f4;
-        }
+    <div className="mx-auto w-full max-w-[1450px] rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:rounded-3xl sm:p-3">
 
-        .dt-map .leaflet-control-attribution {
-          font-size: 9px;
-        }
-
-        .dt-zone-icon {
-          background: transparent !important;
-          border: none !important;
-        }
-
-        .dt-zone-icon span {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          border: 2px solid #94a3b8;
-          background: white;
-          color: #334155;
-          font-size: 9px;
-          font-weight: 900;
-          box-shadow: 0 2px 8px #0003;
-        }
-
-        .dt-zone-icon span.active {
-          background: #b91c1c;
-          color: white;
-          border-color: white;
-        }
-
-        .dt-range {
-          accent-color: #b91c1c;
-        }
-
-        @media (max-width: 639px) {
-          .dt-zone-icon span {
-            width: 27px;
-            height: 27px;
-            font-size: 8px;
-          }
-        }
-      `}</style>
-
-      {/* PETA */}
+      {/* ================================================
+          LEAFLET MAP
+      ================================================ */}
 
       <div className="relative h-[430px] overflow-hidden rounded-xl bg-slate-100 sm:h-[570px] sm:rounded-2xl lg:h-[660px]">
+
         <div
           ref={mapElement}
-          className="dt-map absolute inset-0 z-0"
-          aria-label="Peta mobilitas Denpasar"
+          className="absolute inset-0 z-0 h-full w-full"
+          aria-label="Peta mobilitas Denpasar dan jaringan TMD"
         />
 
         {/* TOOLBAR */}
 
-        <div className="absolute left-2 right-2 top-2 z-[1000] flex items-center gap-1.5 rounded-xl bg-slate-900/95 p-1.5 text-white shadow-lg sm:left-4 sm:right-auto sm:top-4 sm:p-2">
+        <div className="absolute left-2 right-2 top-2 z-[1000] flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-md sm:left-4 sm:right-auto sm:top-4">
+
           <button
+            type="button"
             onClick={showAllZones}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold sm:flex-none sm:px-3 sm:text-xs ${
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
               mode === "zones"
-                ? "bg-red-700"
-                : "bg-slate-700 hover:bg-slate-600"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <MapIcon size={14} />
@@ -1541,11 +1578,12 @@ export default function SimulationPreview({
           </button>
 
           <button
+            type="button"
             onClick={focusStreet}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-semibold sm:flex-none sm:px-3 sm:text-xs ${
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
               mode === "street"
-                ? "bg-red-700"
-                : "bg-slate-700 hover:bg-slate-600"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <CarFront size={14} />
@@ -1553,59 +1591,89 @@ export default function SimulationPreview({
           </button>
 
           <button
-            onClick={() => setPlaying((v) => !v)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-700"
-            aria-label={playing ? "Jeda" : "Jalankan"}
+            type="button"
+            onClick={toggleNetworkOnly}
+            aria-pressed={networkOnly}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
+              networkOnly
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
           >
-            {playing
-              ? <Pause size={16} />
-              : <Play size={16} />
-            }
+            <Network size={14} />
+            {networkOnly
+              ? "Tampilkan MAT"
+              : "Jaringan TMD saja"}
+          </button>
+
+          <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
+
+          <button
+            type="button"
+            onClick={() => setPlaying((value) => !value)}
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 hover:bg-slate-100"
+            aria-label={playing ? "Jeda kendaraan" : "Jalankan kendaraan"}
+          >
+            {playing ? (
+              <Pause size={15} />
+            ) : (
+              <Play size={15} />
+            )}
           </button>
 
           <button
+            type="button"
             onClick={reset}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-700"
-            aria-label="Reset pengaturan"
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 hover:bg-slate-100"
+            aria-label="Reset peta"
           >
-            <RotateCcw size={16} />
+            <RotateCcw size={15} />
           </button>
         </div>
 
         {/* ZOOM */}
 
-        <div className="absolute right-2 top-[65px] z-[1000] flex flex-col gap-1.5 sm:right-4 sm:top-20">
+        <div className="absolute right-2 top-[105px] z-[1000] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md sm:right-4 sm:top-20">
+
           <button
+            type="button"
             onClick={() =>
               mapRef.current?.zoomIn(0.5, {
                 animate: false,
               })
             }
-            className="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-900 shadow-md"
+            className="grid h-10 w-10 place-items-center text-slate-800 hover:bg-slate-50"
             aria-label="Zoom in"
           >
-            <Plus size={19} />
+            <Plus size={18} />
           </button>
 
+          <div className="mx-2 h-px bg-slate-200" />
+
           <button
+            type="button"
             onClick={() =>
               mapRef.current?.zoomOut(0.5, {
                 animate: false,
               })
             }
-            className="grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-900 shadow-md"
+            className="grid h-10 w-10 place-items-center text-slate-800 hover:bg-slate-50"
             aria-label="Zoom out"
           >
-            <Minus size={19} />
+            <Minus size={18} />
           </button>
         </div>
 
         {/* LOADING */}
 
         {loading && (
-          <div className="pointer-events-none absolute inset-0 z-[1100] grid place-items-center bg-slate-100/75 px-4">
-            <div className="rounded-xl bg-white px-5 py-4 text-center text-sm font-semibold text-slate-800 shadow-lg">
-              Memuat jaringan jalan Denpasar...
+          <div className="pointer-events-none absolute inset-0 z-[1100] flex items-center justify-center bg-white/70 p-4">
+            <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 text-center shadow-sm">
+              <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#B91C1C]" />
+
+              <p className="text-xs font-semibold text-slate-800">
+                Memuat jaringan jalan Denpasar...
+              </p>
             </div>
           </div>
         )}
@@ -1613,363 +1681,371 @@ export default function SimulationPreview({
         {/* ERROR */}
 
         {error && (
-          <div className="absolute bottom-14 left-2 right-2 z-[1100] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-900 shadow sm:left-4 sm:right-auto sm:max-w-lg">
+          <div className="absolute bottom-14 left-3 right-3 z-[1100] rounded-xl border border-amber-200 bg-white p-3 text-xs text-amber-900 shadow-sm sm:right-auto sm:max-w-lg">
             <Info size={14} className="mr-1 inline" />
             {error}
           </div>
         )}
 
-        {/* INFO KENDARAAN */}
+        {/* INFORMASI MODE JARINGAN */}
 
-        <div className="pointer-events-none absolute bottom-2 left-2 z-[900] rounded-lg bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-800 shadow sm:bottom-4 sm:left-4 sm:text-xs">
-          {formatNumber(visibleCount)} kendaraan terlihat
-        </div>
-
-        <div className="pointer-events-none absolute bottom-2 right-2 z-[900] hidden rounded-lg bg-white/95 px-3 py-2 text-[10px] font-semibold text-slate-700 shadow sm:block">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-            Asal dominan (MAT)
+        {networkOnly ? (
+          <div className="pointer-events-none absolute bottom-3 left-3 z-[900] flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
+            <BusFront size={15} className="text-[#B91C1C]" />
+            6 Koridor Trans Metro Dewata
           </div>
+        ) : (
+          <>
+            <div className="pointer-events-none absolute bottom-3 left-3 z-[900] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
+              {formatNumber(visibleCount)} kendaraan terlihat
+            </div>
 
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-            Tujuan dominan (MAT)
-          </div>
+            <div className="pointer-events-none absolute bottom-3 right-3 z-[900] hidden rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm sm:block">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                Asal dominan MAT
+              </div>
 
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-            Zona lainnya
-          </div>
-        </div>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                Tujuan dominan MAT
+              </div>
+
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                Zona lainnya
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* PANEL RESPONSIVE */}
+      {/* ================================================
+          NETWORK ONLY INFORMATION
+      ================================================ */}
 
-      <div className="grid gap-5 p-3 sm:p-5 lg:grid-cols-3">
-        {/* PENGATURAN */}
-
-        <section className="min-w-0 space-y-3">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-            <SlidersHorizontal size={17} />
-            Pengaturan Lalu Lintas
-          </h3>
-
-          {showScenarioControls && (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setScenario("before")}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
-                  scenario === "before"
-                    ? "bg-red-700 text-white"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                Before TDM
-              </button>
-
-              <button
-                onClick={() => setScenario("after")}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
-                  scenario === "after"
-                    ? "bg-emerald-700 text-white"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                After TDM
-              </button>
+      {networkOnly ? (
+        <div className="px-3 py-5 sm:px-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Jaringan Trans Metro Dewata
+              </h3>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                Peta menampilkan koridor TMD beserta titik
+                pemberhentian utama. Posisi bus merupakan
+                simulasi visual, bukan lokasi GPS aktual.
+              </p>
             </div>
-          )}
 
-          <label className="block text-xs font-semibold text-slate-700">
-            Kepadatan visual: {density.toFixed(2)}×
-
-            <input
-              type="range"
-              min="0.4"
-              max="1.6"
-              step="0.05"
-              value={density}
-              onChange={(e) =>
-                setDensity(Number(e.target.value))
-              }
-              className="dt-range mt-2 block w-full"
-            />
-          </label>
-
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-700">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showHeat}
-                onChange={(e) =>
-                  setShowHeat(e.target.checked)
-                }
-              />
-              Intensitas Ruas (Model)
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showOD}
-                onChange={(e) =>
-                  setShowOD(e.target.checked)
-                }
-              />
-              Garis OD Terbesar
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showHotspots}
-                onChange={(e) =>
-                  setShowHotspots(e.target.checked)
-                }
-              />
-              Tekanan MAT per Zona
-            </label>
+            <span className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+              6 Koridor
+            </span>
           </div>
 
-          <p className="text-[11px] leading-5 text-slate-500">
-            Warna dan kepadatan kendaraan menggambarkan{" "}
-            <b>indikasi arus model</b>. Titik besar menunjukkan
-            besarnya aktivitas perjalanan (MAT), bukan kemacetan
-            terukur atau V/C jalan.
-          </p>
-        </section>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {TMD_CORRIDORS.map((corridor) => (
+              <div
+                key={corridor.id}
+                className="flex items-start gap-2.5 rounded-xl border border-slate-200 p-3"
+              >
+                <span
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[10px] font-bold text-white"
+                  style={{
+                    backgroundColor: corridor.color,
+                  }}
+                >
+                  {corridor.id}
+                </span>
 
-        {/* ZONA */}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-900">
+                    {corridor.name}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    {corridor.route}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ============================================
+              MAT CONTROLS
+          ============================================ */}
 
-        <section className="min-w-0 space-y-3">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-            <Network size={17} />
-            Matriks Asal Tujuan
-          </h3>
+          <div className="grid gap-5 p-3 sm:p-5 lg:grid-cols-3">
 
-          <label className="block text-xs font-medium text-slate-700">
-            Zona Asal
+            <section className="min-w-0 space-y-4">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <SlidersHorizontal size={17} />
+                Pengaturan Lalu Lintas
+              </h3>
 
-            <select
-              value={origin}
-              onChange={(e) =>
-                setOrigin(e.target.value)
-              }
-              className="mt-1 block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800"
-            >
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.id} - {z.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              {showScenarioControls && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScenario("before")}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                      scenario === "before"
+                        ? "bg-[#B91C1C] text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    Before TDM
+                  </button>
 
-          <label className="block text-xs font-medium text-slate-700">
-            Zona Tujuan
+                  <button
+                    type="button"
+                    onClick={() => setScenario("after")}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                      scenario === "after"
+                        ? "bg-[#0F766E] text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    After TDM
+                  </button>
+                </div>
+              )}
 
-            <select
-              value={destination}
-              onChange={(e) =>
-                setDestination(e.target.value)
-              }
-              className="mt-1 block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800"
-            >
-              {zones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.id} - {z.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </section>
+              <label className="block text-xs font-semibold text-slate-700">
+                Kepadatan visual: {density.toFixed(2)}×
 
-        {/* SOROTAN MAT */}
+                <input
+                  type="range"
+                  min="0.4"
+                  max="1.6"
+                  step="0.05"
+                  value={density}
+                  onChange={(event) =>
+                    setDensity(Number(event.target.value))
+                  }
+                  className="mt-3 block w-full accent-[#B91C1C]"
+                />
+              </label>
 
-        {insights &&
-          insights.byOrigin.length > 0 &&
-          insights.byDestination.length > 0 &&
-          insights.odPairs.length > 0 && (
-            <section className="min-w-0 border-y border-slate-200 py-4 lg:col-span-3 sm:py-5">
-              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-bold tracking-tight text-slate-900">
-                  Sorotan pergerakan · MAT 2026
+              <div className="space-y-2.5 text-xs text-slate-700">
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showHeat}
+                    onChange={(event) =>
+                      setShowHeat(event.target.checked)
+                    }
+                    className="accent-[#B91C1C]"
+                  />
+                  Intensitas Ruas (Model)
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showOD}
+                    onChange={(event) =>
+                      setShowOD(event.target.checked)
+                    }
+                    className="accent-[#B91C1C]"
+                  />
+                  Garis OD Terbesar
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showHotspots}
+                    onChange={(event) =>
+                      setShowHotspots(event.target.checked)
+                    }
+                    className="accent-[#B91C1C]"
+                  />
+                  Aktivitas MAT per Zona
+                </label>
+              </div>
+
+              <p className="text-[11px] leading-5 text-slate-500">
+                Warna ruas dan kepadatan kendaraan adalah
+                visualisasi ilustratif berdasarkan arus model,
+                bukan pengukuran kemacetan aktual.
+              </p>
+            </section>
+
+            {/* ==========================================
+                ZONE SELECTION
+            ========================================== */}
+
+            <section className="min-w-0 space-y-4">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <Network size={17} />
+                Matriks Asal Tujuan
+              </h3>
+
+              <label className="block text-xs font-medium text-slate-700">
+                Zona Asal
+
+                <select
+                  value={origin}
+                  onChange={(event) =>
+                    setOrigin(event.target.value)
+                  }
+                  className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#B91C1C]"
+                >
+                  {zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.id} - {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-xs font-medium text-slate-700">
+                Zona Tujuan
+
+                <select
+                  value={destination}
+                  onChange={(event) =>
+                    setDestination(event.target.value)
+                  }
+                  className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-[#B91C1C]"
+                >
+                  {zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.id} - {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+
+            {/* ==========================================
+                MAT STATISTICS
+            ========================================== */}
+
+            <section className="min-w-0 rounded-xl bg-slate-50 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                {scenario === "after"
+                  ? "MAT Setelah TDM — Asumsi"
+                  : "Total MAT 2026"}
+              </p>
+
+              <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                {network
+                  ? formatNumber(
+                      scenario === "after"
+                        ? afterTotal
+                        : insights?.total
+                    )
+                  : "-"}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                smp/jam
+              </p>
+
+              <div className="my-4 h-px bg-slate-200" />
+
+              <p className="text-xs font-bold text-[#B91C1C]">
+                OD {origin} → {destination}
+              </p>
+
+              <p className="mt-1 text-xl font-bold text-slate-900">
+                {shownOD == null
+                  ? "-"
+                  : formatNumber(shownOD)}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                smp/jam
+              </p>
+
+              {scenario === "after" && (
+                <p className="mt-3 text-[11px] leading-5 text-amber-800">
+                  Perubahan OD di pratinjau menggunakan asumsi
+                  demonstrasi, bukan hasil kalibrasi atau
+                  proyeksi resmi.
+                </p>
+              )}
+            </section>
+          </div>
+
+          {/* ============================================
+              MAT SUMMARY
+          ============================================ */}
+
+          {insights && insights.odPairs.length > 0 && (
+            <div className="border-t border-slate-100 px-3 py-5 sm:px-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Sorotan Pergerakan · MAT 2026
                 </h3>
 
                 <span className="text-[11px] text-slate-500">
-                  smp/jam · berdasarkan ToR
+                  Satuan: smp/jam
                 </span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3 sm:gap-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const z = insights.byOrigin[0];
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
 
-                    setOrigin(z.id);
-                    setShowOD(true);
-
-                    mapRef.current?.setView(
-                      [z.lat, z.lng],
-                      13.5,
-                      { animate: false }
-                    );
-                  }}
-                  className="group min-w-0 text-left sm:border-r sm:border-slate-200 sm:pr-5"
-                  title="Fokus zona asal terbesar pada peta"
-                >
-                  <span className="block text-[11px] text-slate-500">
+                <div>
+                  <p className="text-xs text-slate-500">
                     Asal terbesar
-                  </span>
+                  </p>
 
-                  <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
-                      {insights.byOrigin[0].id}
-                    </strong>
+                  <p className="mt-1 text-xl font-bold text-slate-900">
+                    {insights.byOrigin[0]?.id}
+                  </p>
 
-                    <span className="text-xs text-slate-600">
-                      {formatNumber(insights.byOrigin[0].out)} smp/jam
-                    </span>
-                  </span>
+                  <p className="text-xs text-slate-600">
+                    {formatNumber(
+                      insights.byOrigin[0]?.out
+                    )}{" "}
+                    smp/jam
+                  </p>
+                </div>
 
-                  <span className="mt-1 block truncate text-[11px] text-slate-500">
-                    {insights.byOrigin[0].name}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const z = insights.byDestination[0];
-
-                    setDestination(z.id);
-                    setShowOD(true);
-
-                    mapRef.current?.setView(
-                      [z.lat, z.lng],
-                      13.5,
-                      { animate: false }
-                    );
-                  }}
-                  className="group min-w-0 text-left sm:border-r sm:border-slate-200 sm:px-5"
-                  title="Fokus zona tujuan terbesar pada peta"
-                >
-                  <span className="block text-[11px] text-slate-500">
+                <div>
+                  <p className="text-xs text-slate-500">
                     Tujuan terbesar
-                  </span>
+                  </p>
 
-                  <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
-                      {insights.byDestination[0].id}
-                    </strong>
+                  <p className="mt-1 text-xl font-bold text-slate-900">
+                    {insights.byDestination[0]?.id}
+                  </p>
 
-                    <span className="text-xs text-slate-600">
-                      {formatNumber(insights.byDestination[0].incoming)} smp/jam
-                    </span>
-                  </span>
+                  <p className="text-xs text-slate-600">
+                    {formatNumber(
+                      insights.byDestination[0]?.incoming
+                    )}{" "}
+                    smp/jam
+                  </p>
+                </div>
 
-                  <span className="mt-1 block truncate text-[11px] text-slate-500">
-                    {insights.byDestination[0].name}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const pair = insights.odPairs[0];
-
-                    setOrigin(pair.origin.id);
-                    setDestination(pair.destination.id);
-                    setShowOD(true);
-
-                    mapRef.current?.fitBounds(
-                      [
-                        [pair.origin.lat, pair.origin.lng],
-                        [pair.destination.lat, pair.destination.lng],
-                      ],
-                      {
-                        padding: [60, 60],
-                        maxZoom: 13,
-                        animate: false,
-                      }
-                    );
-                  }}
-                  className="group min-w-0 text-left sm:pl-5"
-                  title="Sorot hubungan OD terkuat pada peta"
-                >
-                  <span className="block text-[11px] text-slate-500">
+                <div>
+                  <p className="text-xs text-slate-500">
                     Hubungan OD utama
-                  </span>
+                  </p>
 
-                  <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <strong className="text-xl font-bold tabular-nums tracking-tight text-slate-900 group-hover:text-[#B91C1C]">
-                      {insights.odPairs[0].origin.id} →{" "}
-                      {insights.odPairs[0].destination.id}
-                    </strong>
+                  <p className="mt-1 text-xl font-bold text-slate-900">
+                    {insights.odPairs[0]?.origin.id} →{" "}
+                    {insights.odPairs[0]?.destination.id}
+                  </p>
 
-                    <span className="text-xs text-slate-600">
-                      {formatNumber(insights.odPairs[0].value)} smp/jam
-                    </span>
-                  </span>
-
-                  <span className="mt-1 block text-[11px] text-slate-500">
-                    Klik untuk menyorot hubungan perjalanan
-                  </span>
-                </button>
+                  <p className="text-xs text-slate-600">
+                    {formatNumber(
+                      insights.odPairs[0]?.value
+                    )}{" "}
+                    smp/jam
+                  </p>
+                </div>
               </div>
-
-              <p className="mt-4 text-[11px] leading-5 text-slate-500">
-                Angka menunjukkan bangkitan, tarikan, dan hubungan
-                perjalanan MAT; bukan tingkat kemacetan ruas jalan.
-              </p>
-            </section>
+            </div>
           )}
-
-        {/* STATISTIK */}
-
-        <section className="min-w-0 rounded-xl bg-slate-50 p-4 sm:rounded-2xl sm:p-5">
-          <p className="text-xs font-bold text-slate-600">
-            {scenario === "after"
-              ? "MAT SETELAH TDM - ASUMSI"
-              : "TOTAL MAT 2026 (INPUT TOR)"}
-          </p>
-
-          <p className="mt-2 break-words text-2xl font-black text-slate-900">
-            {network
-              ? formatNumber(
-                  scenario === "after"
-                    ? afterTotal
-                    : network.metadata.matTotal
-                )
-              : "-"}
-
-            <span className="ml-2 text-xs font-normal">
-              smp/jam
-            </span>
-          </p>
-
-          <p className="mt-4 text-xs font-bold text-red-700">
-            OD {origin} → {destination}
-          </p>
-
-          <p className="mt-1 text-lg font-black text-slate-900">
-            {shownOD == null ? "-" : formatNumber(shownOD)}
-
-            <span className="text-xs font-normal">
-              {" "}smp/jam
-            </span>
-          </p>
-
-          {scenario === "after" && (
-            <p className="mt-2 text-[11px] leading-5 text-amber-800">
-              Skenario ilustratif: pengurangan 30% pada OD Z11 → Z03
-              dan 12% pada OD lainnya. Angka ini asumsi demo, bukan
-              hasil perhitungan dampak TDM atau proyeksi resmi 2041.
-            </p>
-          )}
-        </section>
-      </div>
+        </>
+      )}
     </div>
   );
 }
