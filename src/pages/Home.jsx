@@ -31,19 +31,16 @@ const statistics = [
 
 const researchFocus = [
   {
-    number: "01",
     title: "Pola pergerakan",
     description:
       "Mengidentifikasi bangkitan, tarikan, dan distribusi perjalanan antarzona berdasarkan Matriks Asal Tujuan.",
   },
   {
-    number: "02",
     title: "Strategi TDM",
     description:
       "Mengkaji pengelolaan permintaan perjalanan, integrasi angkutan umum, dan pengendalian penggunaan kendaraan pribadi.",
   },
   {
-    number: "03",
     title: "Evaluasi skenario",
     description:
       "Menyiapkan perbandingan kinerja jaringan antara kondisi Business as Usual dan penerapan kebijakan TDM pada 2041.",

@@ -6,6 +6,10 @@ import {
   SlidersHorizontal,
   BarChart3,
   ShieldCheck,
+  HardDrive,
+  Road,
+  FileText,
+  SquareSigma,
 } from "lucide-react";
 
 import Reveal from "../components/ui/Reveal";
@@ -19,42 +23,36 @@ import Reveal from "../components/ui/Reveal";
 
 const steps = [
   {
-    number: "01",
-    icon: Database,
+    icon: HardDrive,
     title: "Data Preparation",
     description:
       "Validasi MAT 13 zona, jaringan jalan, atribut kapasitas, dan data layanan transportasi.",
   },
   {
-    number: "02",
     icon: Network,
     title: "Network Representation",
     description:
       "Merepresentasikan simpang dan ruas dalam struktur graf dengan atribut panjang, kapasitas, dan kecepatan.",
   },
   {
-    number: "03",
-    icon: Calculator,
+    icon: Road,
     title: "Traffic Assignment",
     description:
       "Mencari rute terpendek dan membebankan permintaan OD ke jaringan menggunakan algoritma yang terdefinisi.",
   },
   {
-    number: "04",
-    icon: SlidersHorizontal,
+    icon: FileText,
     title: "TDM Scenario Development",
     description:
       "Menguji perubahan biaya, waktu, tujuan, moda, kapasitas, dan konfigurasi layanan.",
   },
   {
-    number: "05",
-    icon: BarChart3,
+    icon: SquareSigma,
     title: "Performance Evaluation",
     description:
       "Menghitung volume ruas, V/C ratio, waktu tempuh, VKT, dan VHT jika input mencukupi.",
   },
   {
-    number: "06",
     icon: ShieldCheck,
     title: "Validation & Limitations",
     description:
