@@ -38,6 +38,7 @@ import { MODEL_ZONES } from "../data/modelEngine";
 
 import {
   POLICY_SCENARIOS,
+  POLICY_REFERENCES,
   createPolicyModel,
   normalizePolicy,
 } from "../data/policyEngine";
@@ -342,30 +343,77 @@ function Slider({
   max = 100,
   step = 1,
   unit = "%",
+  policyKey,
 }) {
-  return (
-    <label className="block border-b border-slate-100 py-3.5 last:border-0">
-      <span className="mb-2 flex items-center justify-between gap-3 text-[12px] font-medium text-slate-700">
-        <span>{label}</span>
+  const reference = POLICY_REFERENCES[policyKey];
+  const inputId = `dm-policy-${policyKey}`;
 
+  return (
+    <div className="border-b border-slate-100 py-4 last:border-0">
+      <label
+        htmlFor={inputId}
+        className="mb-2 flex items-center justify-between gap-3 text-[12px] font-medium text-slate-700"
+      >
+        <span>{label}</span>
         <strong className="shrink-0 font-semibold tabular-nums text-[#B91C1C]">
-          {format(value, step < 1 ? 2 : 0)}
-          {unit}
+          {format(value, step < 1 ? 2 : 0)}{unit}
         </strong>
-      </span>
+      </label>
 
       <input
+        id={inputId}
         type="range"
         value={value}
         min={min}
         max={max}
         step={step}
-        onChange={(event) =>
-          onChange(Number(event.target.value))
-        }
+        onChange={(event) => onChange(Number(event.target.value))}
         className="block h-1.5 w-full cursor-pointer accent-[#B91C1C]"
       />
-    </label>
+
+      {reference && (
+        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
+          <p>
+            <span className="font-bold text-slate-800">
+              Dasar preset {reference.preset}: {" "}
+            </span>
+            {reference.reason}
+          </p>
+
+          {reference.sources?.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {reference.sources.map((source) => (
+                <a
+                  key={source.url}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`${source.role}. Buka rujukan resmi di tab baru.`}
+                  className="font-semibold text-[#B91C1C] underline decoration-[#B91C1C]/30 underline-offset-2 hover:text-[#991B1B]"
+                >
+                  Lihat sumber: {source.label} ↗
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 font-semibold text-amber-800">
+              Referensi numerik khusus Denpasar belum tersedia.
+            </p>
+          )}
+
+          <details className="mt-2 border-t border-slate-200/80 pt-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700 hover:text-[#B91C1C]">
+              Status angka dan keterbatasan penelitian
+            </summary>
+            <p className="mt-2">{reference.status}</p>
+            <p className="mt-1">{reference.evidence}</p>
+            <p className="mt-1 font-medium text-slate-700">
+              Saat slider diubah, angka baru adalah nilai uji pengguna dan belum otomatis menjadi angka terkalibrasi.
+            </p>
+          </details>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2040,6 +2088,36 @@ export default function ModelOverview({
                       skenario ditekan.
                     </p>
 
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[11px] leading-5 text-slate-600">
+                      <p className="font-bold text-slate-800">Referensi dan alasan pemilihan nilai</p>
+                      <p className="mt-1">
+                        Di bawah tiap slider ada alasan preset dan tautan sumber yang dapat dibuka.
+                        Referensi menjelaskan mekanisme atau rentang pembanding,
+                        bukan mengesahkan semua persentase sebagai hasil survei Denpasar.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-semibold text-[#B91C1C]">
+                        <a
+                          href="https://peraturan.bpk.go.id/Details/5162/pp-no-32-tahun-2011"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2"
+                        >
+                          PP 32/2011 — kebijakan TDM ↗
+                        </a>
+                        <a
+                          href="https://binamarga.pu.go.id/index.php/nspk/detail/09pbm2023-pedoman-kapasitas-jalan-indonesia-"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2"
+                        >
+                          PKJI 2023 — kinerja ruas jalan ↗
+                        </a>
+                      </div>
+                      <p className="mt-2 text-[10px] text-slate-500">
+                        PKJI digunakan untuk kapasitas dan derajat kejenuhan; PKJI tidak menetapkan nilai 8%, 25%, atau indeks feeder 30%.
+                      </p>
+                    </div>
+
                     <div className="mt-4 flex flex-wrap gap-2">
                       {Object.entries(
                         POLICY_SCENARIOS
@@ -2075,6 +2153,7 @@ export default function ModelOverview({
                     <div className="mt-3">
                       <Slider
                         label="Pertumbuhan tahunan"
+                        policyKey="annualGrowth"
                         min={0}
                         max={5}
                         step={0.25}
@@ -2089,6 +2168,7 @@ export default function ModelOverview({
 
                       <Slider
                         label="Kenaikan tarif parkir"
+                        policyKey="parkingIncrease"
                         min={0}
                         max={100}
                         step={5}
@@ -2103,6 +2183,7 @@ export default function ModelOverview({
 
                       <Slider
                         label="Headway TMD"
+                        policyKey="targetHeadway"
                         unit=" menit"
                         min={5}
                         max={30}
@@ -2117,6 +2198,7 @@ export default function ModelOverview({
 
                       <Slider
                         label="Akses feeder"
+                        policyKey="feederAccess"
                         min={0}
                         max={100}
                         step={5}
@@ -2131,6 +2213,7 @@ export default function ModelOverview({
 
                       <Slider
                         label="Pergeseran jam puncak"
+                        policyKey="peakShift"
                         min={0}
                         max={30}
                         value={draft.peakShift}
@@ -2157,7 +2240,119 @@ export default function ModelOverview({
                           className="h-4 w-4 accent-[#B91C1C]"
                         />
                       </label>
+                      <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
+                        <p>
+                          <strong className="text-slate-800">Mengapa prioritas bus aktif? </strong>
+                          {POLICY_REFERENCES.busPriority.reason}
+                        </p>
+                        <a
+                          href={POLICY_REFERENCES.busPriority.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block font-semibold text-[#B91C1C] underline underline-offset-2"
+                        >
+                          Lihat sumber: NACTO — prioritas bus ↗
+                        </a>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {POLICY_REFERENCES.busPriority.status}
+                        </p>
+                      </div>
                     </div>
+
+                    {/* KEBIJAKAN TAMBAHAN: NILAI AWAL 0 DI SEMUA PRESET */}
+                    <section className="mt-6 border-t border-slate-200 pt-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-slate-900">
+                          Kebijakan TDM tambahan
+                        </h3>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+                          Default: 0% · Tidak aktif
+                        </span>
+                      </div>
+
+                      <p className="mt-2 text-[11px] leading-6 text-slate-500">
+                        Ketiganya tersedia untuk uji sensitivitas,
+                        tetapi tidak dihitung dalam preset Terintegrasi
+                        sampai nilainya kamu ubah. Persentase di bawah
+                        adalah proksi perubahan kendaraan ekuivalen
+                        dalam MAT, bukan persentase pekerja atau penumpang.
+                      </p>
+
+                      <div className="mt-3">
+                        <Slider
+                          label="Pengurangan perjalanan via WFH"
+                          policyKey="wfhReduction"
+                          min={0}
+                          max={20}
+                          step={1}
+                          value={draft.wfhReduction ?? 0}
+                          onChange={(value) =>
+                            updateDraft("wfhReduction", value)
+                          }
+                        />
+                        <Slider
+                          label="Peralihan park-and-ride (OD prioritas)"
+                          policyKey="parkRideShift"
+                          min={0}
+                          max={25}
+                          step={1}
+                          value={draft.parkRideShift ?? 0}
+                          onChange={(value) =>
+                            updateDraft("parkRideShift", value)
+                          }
+                        />
+                        <Slider
+                          label="Peralihan sepeda (OD dekat)"
+                          policyKey="bikeShift"
+                          min={0}
+                          max={25}
+                          step={1}
+                          value={draft.bikeShift ?? 0}
+                          onChange={(value) =>
+                            updateDraft("bikeShift", value)
+                          }
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-[11px] text-slate-500">
+                          Tambahan aktif:{" "}
+                          <strong className="text-slate-800">
+                            {[
+                              draft.wfhReduction,
+                              draft.parkRideShift,
+                              draft.bikeShift,
+                            ].filter((v) => Number(v) > 0).length}
+                            /3
+                          </strong>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDraft((prev) =>
+                              normalizePolicy({
+                                ...prev,
+                                wfhReduction: 0,
+                                parkRideShift: 0,
+                                bikeShift: 0,
+                              })
+                            )
+                          }
+                          className="text-[11px] font-semibold text-[#B91C1C] hover:underline"
+                        >
+                          Reset tambahan ke 0%
+                        </button>
+                      </div>
+
+                      <p className="mt-3 text-[10px] leading-5 text-slate-500">
+                        Perhitungan tambahan dilakukan berurutan dari
+                        sisa permintaan: WFH → park-and-ride → sepeda.
+                        Park-and-ride dibatasi pada OD prioritas;
+                        sepeda dibatasi pada pasangan pusat zona
+                        dengan jarak garis lurus sampai 5 km.
+                        Keduanya belum terkalibrasi.
+                      </p>
+                    </section>
 
                     <button
                       type="button"
