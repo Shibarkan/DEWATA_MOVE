@@ -8,6 +8,7 @@ import {
   Pause,
   Play,
   Plus,
+  Route,
   RotateCcw,
 } from "lucide-react";
 import { formatNumber } from "./simulationUtils";
@@ -15,11 +16,11 @@ import { formatNumber } from "./simulationUtils";
 export default function SimulationMapControls({
   mapElement,
   mapRef,
-  mode,
+  mapMode,
   networkOnly,
-  onShowAllZones,
-  onFocusStreet,
-  onToggleNetworkOnly,
+  onSelectMapMode,
+  showOD,
+  setShowOD,
   playing,
   setPlaying,
   onReset,
@@ -35,45 +36,61 @@ export default function SimulationMapControls({
         aria-label="Peta mobilitas Denpasar dan jaringan TMD"
       />
 
-      <div className="absolute left-2 right-2 top-2 z-[1000] flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-md sm:left-4 sm:right-auto sm:top-4">
+      <div className="absolute left-2 top-2 z-[1000] flex w-fit max-w-[calc(100%-1rem)] flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-md sm:left-4 sm:top-4">
         <button
           type="button"
-          onClick={onShowAllZones}
+          onClick={() => onSelectMapMode("roads")}
           className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
-            mode === "zones"
-              ? "bg-[#B91C1C] text-white"
-              : "text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          <MapIcon size={14} />
-          13 Zona
-        </button>
-
-        <button
-          type="button"
-          onClick={onFocusStreet}
-          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
-            mode === "street"
+            mapMode === "roads"
               ? "bg-[#B91C1C] text-white"
               : "text-slate-700 hover:bg-slate-100"
           }`}
         >
           <CarFront size={14} />
-          Fokus Jalan
+          Jaringan Jalan
         </button>
 
         <button
           type="button"
-          onClick={onToggleNetworkOnly}
-          aria-pressed={networkOnly}
+          onClick={() => onSelectMapMode("tmd")}
           className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
-            networkOnly
+            mapMode === "tmd"
               ? "bg-[#B91C1C] text-white"
               : "text-slate-700 hover:bg-slate-100"
           }`}
         >
           <Network size={14} />
-          {networkOnly ? "Tampilkan MAT" : "Jaringan TMD saja"}
+          Jaringan TMD
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onSelectMapMode("all")}
+          aria-pressed={mapMode === "all"}
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
+            mapMode === "all"
+              ? "bg-[#B91C1C] text-white"
+              : "text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          <MapIcon size={14} />
+          Denpasar Bali
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowOD((visible) => !visible)}
+          disabled={networkOnly}
+          aria-pressed={showOD}
+          title={networkOnly ? "OD tidak ditampilkan pada mode Jaringan TMD" : undefined}
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs disabled:cursor-not-allowed disabled:opacity-50 ${
+            showOD
+              ? "bg-[#B91C1C] text-white"
+              : "text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          <Route size={14} />
+          Tampilkan OD
         </button>
 
         <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
@@ -148,19 +165,27 @@ export default function SimulationMapControls({
             {formatNumber(visibleCount)} kendaraan terlihat
           </div>
 
-          <div className="pointer-events-none absolute bottom-3 right-3 z-[900] hidden rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm sm:block">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-              Asal dominan MAT
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-              Tujuan dominan MAT
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              Zona lainnya
-            </div>
+          <div className="pointer-events-none absolute bottom-3 right-3 z-[900] max-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm">
+            <p className="mb-1.5 font-bold text-slate-700">
+              Kepadatan jalan dari MAT
+            </p>
+            {[
+              ["#0F766E", "Rendah"],
+              ["#D3AD4C", "Sedang"],
+              ["#EA751F", "Tinggi"],
+              ["#B91C1C", "Sangat padat"],
+            ].map(([color, label]) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <span
+                  className="h-0.5 w-4 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                {label}
+              </div>
+            ))}
+            <p className="mt-1.5 border-t border-slate-100 pt-1.5 leading-4">
+              Laju kendaraan adalah estimasi visual IDM.
+            </p>
           </div>
         </>
       )}

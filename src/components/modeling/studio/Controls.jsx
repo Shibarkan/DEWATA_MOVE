@@ -124,13 +124,6 @@ export function MapLegend() {
         </span>
       ))}
 
-      <span className="inline-flex items-center gap-1.5">
-        <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
-          <span className="absolute h-3.5 w-3.5 rounded-full border border-[#0F766E]/70 bg-[#0F766E]/10" />
-          <span className="h-1 w-1 rounded-full bg-[#0F766E]" />
-        </span>
-        Aktivitas MAT per zona
-      </span>
     </div>
   );
 }

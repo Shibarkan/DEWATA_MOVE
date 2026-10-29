@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import L from "leaflet";
 import { getDenpasarNetwork } from "../../data/denpasarNetworkBrowser";
 import { addTmdNetworkLayer, TMD_BOUNDS } from "../../data/tmdNetwork";
+import { updateIdm } from "../../data/vehicleDynamics";
 import {
   buildVehicles,
   CITY,
@@ -92,6 +93,9 @@ export function useSimulationMap({
     tmdLayerRef.current = addTmdNetworkLayer(map, {
       animateBuses: true,
     });
+    if (settingsRef.current.mapMode === "roads") {
+      map.removeLayer(tmdLayerRef.current.layer);
+    }
     // Bagian ukuran canvas
 
     function resizeCanvas() {
@@ -138,7 +142,7 @@ export function useSimulationMap({
       if (
         !graph ||
         !settingsRef.current.showHeat ||
-        settingsRef.current.networkOnly
+        settingsRef.current.mapMode === "tmd"
       ) {
         sceneRef.current.heatCanvas = null;
         return;
@@ -197,16 +201,17 @@ export function useSimulationMap({
         const p = map.latLngToContainerPoint(a);
         const q = map.latLngToContainerPoint(b);
 
-        const strength = Math.sqrt(
-          clamp(flow / p95, 0, 3)
-        );
+        const relativeFlow = flow / p95;
+        const strength = Math.sqrt(clamp(relativeFlow, 0, 3));
 
         ctx.strokeStyle =
-          strength > 1
-            ? "rgba(185,28,28,.52)"
-            : strength > 0.45
-              ? "rgba(234,117,31,.38)"
-              : "rgba(234,179,8,.23)";
+          relativeFlow >= 0.8
+            ? "rgba(185,28,28,.62)"
+            : relativeFlow >= 0.5
+              ? "rgba(234,117,31,.5)"
+              : relativeFlow >= 0.25
+                ? "rgba(211,173,76,.42)"
+                : "rgba(15,118,110,.3)";
 
         ctx.lineWidth = clamp(
           1 + strength * 2.3,
@@ -235,6 +240,18 @@ export function useSimulationMap({
       const occupied = new Map();
 
       for (const vehicle of scene.cars) {
+        if (vehicle.status === "waiting") {
+          vehicle.cooldown -= dt;
+
+          if (vehicle.cooldown <= 0) {
+            vehicle.edge = vehicle.startEdge;
+            vehicle.t = vehicle.startT;
+            vehicle.speed = vehicle.desiredSpeed * 0.25;
+            vehicle.opacity = 0;
+            vehicle.status = "moving";
+          }
+        }
+
         if (vehicle.status !== "moving") continue;
 
         if (!occupied.has(vehicle.edge)) {
@@ -249,45 +266,37 @@ export function useSimulationMap({
 
         for (let i = 0; i < group.length; i++) {
           const vehicle = group[i];
+          const leader = i > 0 ? group[i - 1] : null;
           let edge = graph.edges[vehicle.edge];
 
           if (!edge) continue;
 
           const length = Math.max(edge[2], 0.5);
-
-          let targetSpeed = vehicle.desiredSpeed;
-
-          if (i > 0) {
-            const leader = group[i - 1];
-
-            const gap =
-              (leader.t - vehicle.t) * length -
-              leader.length -
-              vehicle.minGap;
-
-            const safeSpeed = Math.sqrt(
-              Math.max(0, 2 * 2.5 * gap)
-            );
-
-            targetSpeed = Math.min(
-              targetSpeed,
-              safeSpeed
-            );
-          }
-
-          const acceleration = clamp(
-            (targetSpeed - vehicle.speed) * 1.8,
-            -4,
-            2.4
+          const leaderGap = leader
+            ? (leader.t - vehicle.t) * length -
+              (leader.length + vehicle.length) / 2 -
+              vehicle.minGap
+            : 10000;
+          const flow = Math.max(0, edge[4] || 0);
+          const visualP95 = Math.max(1, graph.metadata?.visualP95 || 1);
+          const pressure = clamp(flow / visualP95, 0, 3);
+          const targetSpeed =
+            vehicle.desiredSpeed / (1 + pressure * 0.18);
+          const movement = updateIdm(
+            vehicle,
+            targetSpeed,
+            leader?.speed,
+            leaderGap,
+            dt,
           );
 
-          vehicle.speed = clamp(
-            vehicle.speed + acceleration * dt,
-            0,
-            vehicle.desiredSpeed
-          );
+          vehicle.speed = movement.speed;
 
-          let distance = vehicle.speed * dt;
+          const safeDistance = leader
+            ? Math.max(0, leader.t * length - vehicle.t * length -
+                (leader.length + vehicle.length) / 2 - vehicle.minGap)
+            : Infinity;
+          let distance = Math.min(movement.distance, safeDistance);
 
           for (
             let hop = 0;
@@ -344,7 +353,8 @@ export function useSimulationMap({
         );
 
         if (vehicle.opacity <= 0) {
-          vehicle.status = "finished";
+          vehicle.status = "waiting";
+          vehicle.cooldown = 1.2 + (vehicle.seed % 7) * 0.12;
         }
       }
     }
@@ -374,8 +384,8 @@ export function useSimulationMap({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size.x, size.y);
 
-      // In network-only mode, hide the MAT heatmap and vehicles.
-      if (settingsRef.current.networkOnly) {
+      // Only the Denpasar overview shows MAT and traffic overlays.
+      if (settingsRef.current.mapMode === "tmd") {
         return 0;
       }
 
@@ -506,7 +516,7 @@ export function useSimulationMap({
       if (
         settingsRef.current.playing &&
         sceneRef.current.graph &&
-        !settingsRef.current.networkOnly
+        settingsRef.current.mapMode !== "tmd"
       ) {
         let remaining = dt * SIMULATION_SPEED;
 
@@ -587,9 +597,9 @@ export function useSimulationMap({
         const insights = getZoneMatInsights(graph);
 
         if (insights) {
-          const maxActivity = Math.max(
+          const maxAttraction = Math.max(
             1,
-            insights.byActivity[0]?.activity || 1
+            insights.byDestination[0]?.incoming || 1
           );
 
           const origins = new Set(
@@ -602,7 +612,7 @@ export function useSimulationMap({
 
           const group = L.layerGroup();
 
-          insights.byActivity.forEach((zone) => {
+          insights.byDestination.forEach((zone) => {
             const priorityOrigin = origins.has(zone.id);
             const priorityDestination =
               destinations.has(zone.id);
@@ -614,18 +624,18 @@ export function useSimulationMap({
                 : "#F59E0B";
 
             const radius =
-              9 +
-              20 * Math.sqrt(zone.activity / maxActivity);
+              18 +
+              24 * Math.sqrt(zone.incoming / maxAttraction);
 
             L.circleMarker(
               [zone.lat, zone.lng],
               {
                 radius,
                 color,
-                weight: 1.5,
-                opacity: 0.8,
+                weight: 2,
+                opacity: 0.9,
                 fillColor: color,
-                fillOpacity: 0.12,
+                fillOpacity: 0.1,
               }
             )
               .bindTooltip(
@@ -640,7 +650,7 @@ export function useSimulationMap({
 
           if (
             settingsRef.current.showHotspots &&
-            !settingsRef.current.networkOnly
+            settingsRef.current.mapMode !== "tmd"
           ) {
             group.addTo(map);
           }
@@ -664,7 +674,7 @@ export function useSimulationMap({
 
         zoneLayerRef.current = zoneLayer;
 
-        if (!settingsRef.current.networkOnly) {
+        if (settingsRef.current.mapMode !== "tmd") {
           zoneLayer.addTo(map);
         }
 
@@ -672,7 +682,7 @@ export function useSimulationMap({
         setLoading(false);
         setError("");
 
-        if (settingsRef.current.networkOnly) {
+        if (settingsRef.current.mapMode === "tmd") {
           map.fitBounds(TMD_BOUNDS, {
             padding: [26, 26],
             maxZoom: 11,

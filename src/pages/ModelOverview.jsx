@@ -10,7 +10,6 @@ import {
   STAGES, STORAGE_KEY, APPLIED_RUN_KEY, INITIAL_VIEW,
   initialPolicy, readCompletedRun, wait, waitPaint,
 } from "../components/modeling/studio/helpers";
-import IntroLoading from "../components/modeling/studio/IntroLoading";
 import { Headline, Tabs } from "../components/modeling/studio/Navigation";
 import ProcessingModal from "../components/modeling/studio/ProcessingModal";
 import EmptyResults from "../components/modeling/studio/EmptyResults";
@@ -23,18 +22,12 @@ import MethodLimits from "../components/modeling/studio/MethodLimits";
 export default function ModelOverview({
   type = "before",
   onNavigate,
+  onReady,
 }) {
   const stage =
     STAGES.some((x) => x.id === type)
       ? type
       : "before";
-
-  const [intro, setIntro] = useState(true);
-
-  const closeIntro = useCallback(
-    () => setIntro(false),
-    []
-  );
 
   const [runInfo, setRunInfo] = useState(
     readCompletedRun
@@ -73,8 +66,6 @@ export default function ModelOverview({
   // NOTIFICATION
 
   useEffect(() => {
-    if (intro) return;
-
     if (
       (stage === "after" || stage === "comparison") &&
       !ready
@@ -96,7 +87,7 @@ export default function ModelOverview({
     } else {
       toast.dismiss("dm-no-scenario");
     }
-  }, [stage, intro, ready, onNavigate]);
+  }, [stage, ready, onNavigate]);
 
   // SYNCHRONIZE TWO MAPS
 
@@ -159,6 +150,7 @@ export default function ModelOverview({
         setGraph(data);
         setError("");
         setLoading(false);
+        onReady?.();
       })
       .catch((err) => {
         if (canceled) return;
@@ -169,12 +161,13 @@ export default function ModelOverview({
         );
 
         setLoading(false);
+        onReady?.();
       });
 
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [onReady]);
 
   // APPLY TDM SCENARIO
 
@@ -330,9 +323,6 @@ export default function ModelOverview({
             "!rounded-2xl !border !border-slate-200 !bg-white !text-slate-900 !shadow-[0_18px_45px_rgba(15,23,42,.12)]",
         }}
       />
-      <AnimatePresence>
-        {intro && <IntroLoading key="dm-intro" onComplete={closeIntro} />}
-      </AnimatePresence>
       <AnimatePresence>
         {runPhase !== null && (
           <ProcessingModal

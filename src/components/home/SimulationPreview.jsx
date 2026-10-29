@@ -1,9 +1,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { TMD_BOUNDS } from "../../data/tmdNetwork";
+import { createODFlowLayer } from "../../data/odVisualization";
 import { DEFAULT_DENSITY } from "./simulationEngine";
 import SimulationDataPanel from "./SimulationDataPanel";
 import SimulationMapControls from "./SimulationMapControls";
@@ -18,8 +18,6 @@ export default function SimulationPreview({
 
   const mapRef = useRef(null);
   const tmdLayerRef = useRef(null);
-
-  const previousMapViewRef = useRef(null);
 
   const zoneLayerRef = useRef(null);
   const hotspotLayerRef = useRef(null);
@@ -49,15 +47,15 @@ export default function SimulationPreview({
   // Layer MAT
   const [showHeat, setShowHeat] = useState(true);
   const [showHotspots, setShowHotspots] = useState(true);
-  const [showOD, setShowOD] = useState(true);
+  const [showOD, setShowOD] = useState(false);
 
   // Mode TMD
   const [networkOnly, setNetworkOnly] = useState(false);
 
   // Kontrol
-  const [mode, setMode] = useState("zones");
-  const [origin, setOrigin] = useState("Z11");
-  const [destination, setDestination] = useState("Z03");
+  const [mapMode, setMapMode] = useState("all");
+  const [origin, setOrigin] = useState("Z03");
+  const [destination, setDestination] = useState("Z11");
   const [visibleCount, setVisibleCount] = useState(0);
 
   settingsRef.current = {
@@ -67,6 +65,7 @@ export default function SimulationPreview({
     showHeat,
     showHotspots,
     networkOnly,
+    mapMode,
   };
 
   useEffect(() => {
@@ -95,7 +94,7 @@ export default function SimulationPreview({
 
   useEffect(() => {
     redrawHeatRef.current();
-  }, [showHeat, scenario, networkOnly]);
+  }, [showHeat, scenario, networkOnly, mapMode]);
 
   // Bagian visibilitas zona dan hotspot MAT
 
@@ -107,7 +106,7 @@ export default function SimulationPreview({
     const hotspotLayer = hotspotLayerRef.current;
 
     if (zoneLayer) {
-      if (networkOnly) {
+      if (mapMode === "tmd") {
         if (map.hasLayer(zoneLayer)) {
           map.removeLayer(zoneLayer);
         }
@@ -117,7 +116,7 @@ export default function SimulationPreview({
     }
 
     if (hotspotLayer) {
-      const visible = showHotspots && !networkOnly;
+      const visible = showHotspots && mapMode !== "tmd";
 
       if (visible && !map.hasLayer(hotspotLayer)) {
         hotspotLayer.addTo(map);
@@ -127,7 +126,7 @@ export default function SimulationPreview({
         map.removeLayer(hotspotLayer);
       }
     }
-  }, [network, networkOnly, showHotspots]);
+  }, [network, mapMode, showHotspots]);
 
   // Bagian visibilitas layer OD
 
@@ -141,139 +140,97 @@ export default function SimulationPreview({
       odLayerRef.current = null;
     }
 
-    if (!showOD || networkOnly) return;
+    if (!showOD || mapMode === "tmd") return;
 
-    const group = L.layerGroup();
-    const insights = getZoneMatInsights(network);
-
-    const strongestPairs = insights?.odPairs.slice(0, 5) || [];
-
-    const maximum = Math.max(
-      1,
-      strongestPairs[0]?.value || 1
+    const targetIndex = network.zones.findIndex(
+      (zone) => zone.id === destination,
     );
+    const target = network.zones[targetIndex];
 
-    for (const pair of strongestPairs) {
-      const selected =
-        pair.origin.id === origin &&
-        pair.destination.id === destination;
+    if (!target || targetIndex < 0) return;
 
-      L.polyline(
-        [
-          [pair.origin.lat, pair.origin.lng],
-          [pair.destination.lat, pair.destination.lng],
-        ],
-        {
-          color: selected ? "#B91C1C" : "#F97316",
-          weight:
-            1.5 +
-            4 * Math.sqrt(pair.value / maximum),
-          opacity: selected ? 0.72 : 0.28,
-          dashArray: selected ? null : "5 10",
-        }
-      )
-        .bindTooltip(
-          `${pair.origin.id} → ${pair.destination.id}: ` +
-          `${formatNumber(pair.value)} smp/jam`
-        )
-        .addTo(group);
-    }
-
-    const a = network.zones.find(
-      (zone) => zone.id === origin
-    );
-
-    const b = network.zones.find(
-      (zone) => zone.id === destination
-    );
-
-    if (a && b) {
-      L.polyline(
-        [
-          [a.lat, a.lng],
-          [b.lat, b.lng],
-        ],
-        {
-          color: "#B91C1C",
-          weight: 3,
-          dashArray: "8 6",
-          opacity: 0.85,
-          interactive: false,
-        }
-      ).addTo(group);
-    }
+    const flows = network.zones
+      .map((zone, index) => ({
+        origin: zone,
+        value:
+          (Number(network.mat?.[index]?.[targetIndex]) || 0) *
+          (scenario === "after"
+            ? zone.id === "Z11" && destination === "Z03"
+              ? 0.7
+              : 0.88
+            : 1),
+      }))
+      .filter(({ origin: source, value }) => source.id !== target.id && value > 0);
+    const group = createODFlowLayer(flows, target, origin, formatNumber);
 
     group.addTo(map);
     odLayerRef.current = group;
-  }, [network, origin, destination, showOD, networkOnly]);
+  }, [network, origin, destination, scenario, showOD, mapMode]);
 
   // Bagian aksi peta
 
-  function toggleNetworkOnly() {
+  function selectMapMode(nextMode) {
     const map = mapRef.current;
+    const showTmd = nextMode !== "roads";
+    const tmdLayer = tmdLayerRef.current?.layer;
 
-    if (!networkOnly) {
-      if (map) {
-        previousMapViewRef.current = {
-          center: map.getCenter(),
-          zoom: map.getZoom(),
-        };
+    setMapMode(nextMode);
+    setNetworkOnly(nextMode === "tmd");
 
-        map.fitBounds(TMD_BOUNDS, {
-          padding: [26, 26],
-          maxZoom: 11,
-          animate: false,
-        });
-      }
-
-      setNetworkOnly(true);
-      setMode("tmd");
-    } else {
-      const previous = previousMapViewRef.current;
-
-      if (map && previous) {
-        map.setView(
-          previous.center,
-          previous.zoom,
-          { animate: false }
-        );
-      }
-
-      setNetworkOnly(false);
-      setMode("zones");
+    if (nextMode === "tmd") {
+      setShowOD(false);
     }
-  }
 
-  function showAllZones() {
-    const map = mapRef.current;
-
-    setNetworkOnly(false);
-    setMode("zones");
-
-    if (!map || !network?.zones?.length) return;
-
-    map.fitBounds(
-      network.zones.map((zone) => [
-        zone.lat,
-        zone.lng,
-      ]),
-      {
-        padding: [35, 35],
-        maxZoom: 12,
-        animate: false,
+    if (map && tmdLayer) {
+      if (showTmd && !map.hasLayer(tmdLayer)) {
+        tmdLayer.addTo(map);
+      } else if (!showTmd && map.hasLayer(tmdLayer)) {
+        map.removeLayer(tmdLayer);
       }
-    );
-  }
+    }
 
-  function focusStreet() {
-    setNetworkOnly(false);
-    setMode("street");
+    if (nextMode === "all") {
+      setShowHeat(true);
+      setShowHotspots(true);
+    }
 
-    mapRef.current?.setView(
-      [-8.670, 115.216],
-      16,
-      { animate: false }
-    );
+    if (!map) return;
+
+    if (nextMode === "tmd") {
+      map.fitBounds(TMD_BOUNDS, {
+        padding: [26, 26],
+        maxZoom: 11,
+        animate: false,
+      });
+      return;
+    }
+
+    if (nextMode === "roads") {
+      if (network?.zones?.length) {
+        map.fitBounds(
+          network.zones.map((zone) => [zone.lat, zone.lng]),
+          {
+            padding: [35, 35],
+            maxZoom: 12,
+            animate: false,
+          },
+        );
+      } else {
+        map.setView([-8.673, 115.216], 12, { animate: false });
+      }
+      return;
+    }
+
+    if (network?.zones?.length) {
+      map.fitBounds(
+        network.zones.map((zone) => [zone.lat, zone.lng]),
+        {
+          padding: [35, 35],
+          maxZoom: 12,
+          animate: false,
+        }
+      );
+    }
   }
 
   function reset() {
@@ -283,11 +240,11 @@ export default function SimulationPreview({
     setPlaying(true);
     setShowHeat(true);
     setShowHotspots(true);
-    setShowOD(true);
-    setOrigin("Z11");
-    setDestination("Z03");
+    setShowOD(false);
+    setOrigin("Z03");
+    setDestination("Z11");
 
-    showAllZones();
+    selectMapMode("all");
   }
 
   // Bagian data MAT
@@ -345,11 +302,11 @@ export default function SimulationPreview({
       <SimulationMapControls
         mapElement={mapElement}
         mapRef={mapRef}
-        mode={mode}
+        mapMode={mapMode}
         networkOnly={networkOnly}
-        onShowAllZones={showAllZones}
-        onFocusStreet={focusStreet}
-        onToggleNetworkOnly={toggleNetworkOnly}
+        onSelectMapMode={selectMapMode}
+        showOD={showOD}
+        setShowOD={setShowOD}
         playing={playing}
         setPlaying={setPlaying}
         onReset={reset}
@@ -367,8 +324,6 @@ export default function SimulationPreview({
         setDensity={setDensity}
         showHeat={showHeat}
         setShowHeat={setShowHeat}
-        showOD={showOD}
-        setShowOD={setShowOD}
         showHotspots={showHotspots}
         setShowHotspots={setShowHotspots}
         zones={zones}

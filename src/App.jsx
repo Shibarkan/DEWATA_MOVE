@@ -1,23 +1,20 @@
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 
 // DEWATAMOVE 2041 — MAIN APPLICATION
 
 // GLOBAL LAYOUT
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
+import IntroLoading from "./components/modeling/studio/IntroLoading";
 
 // MAIN PAGES
 import Home from "./pages/Home";
-import ProblemSolving from "./pages/ProblemSolving";
-import DataExplorer from "./pages/DataExplorer";
-import Methodology from "./pages/Methodology";
-
-// MODELING STUDIO
-import ModelOverview from "./pages/ModelOverview";
-
-// TRANS METRO DEWATA
-import Transit from "./pages/Transit";
+const ProblemSolving = lazy(() => import("./pages/ProblemSolving"));
+const DataExplorer = lazy(() => import("./pages/DataExplorer"));
+const Methodology = lazy(() => import("./pages/Methodology"));
+const ModelOverview = lazy(() => import("./pages/ModelOverview"));
+const Transit = lazy(() => import("./pages/Transit"));
 
 // PAGE CONFIGURATION
 
@@ -73,6 +70,19 @@ export default function App() {
   const [page, setPage] = useState(
     readPageFromURL
   );
+  const [modelingIntro, setModelingIntro] = useState(
+    () => MODELING_PAGES.includes(readPageFromURL()),
+  );
+  const [modelingReady, setModelingReady] = useState(false);
+
+  const closeModelingIntro = useCallback(
+    () => setModelingIntro(false),
+    [],
+  );
+  const markModelingReady = useCallback(
+    () => setModelingReady(true),
+    [],
+  );
 
   // TRANSIT CONFIGURATION
 
@@ -114,6 +124,15 @@ export default function App() {
 
     if (!ALLOWED_PAGES.includes(nextPage)) {
       return;
+    }
+
+    const enteringModeling =
+      !MODELING_PAGES.includes(page) &&
+      MODELING_PAGES.includes(nextPage);
+
+    if (enteringModeling) {
+      setModelingReady(false);
+      setModelingIntro(true);
     }
 
     // Update current page
@@ -161,57 +180,46 @@ export default function App() {
       />
 
       <main className="min-w-0 flex-1">
-
-        {/* HOME PAGE */}
-
-        {page === "home" && (
-          <Home
-            onNavigate={navigate}
-          />
-        )}
-
-        {/* PROBLEM & TDM SOLUTION */}
-
-        {page === "problems" && (
-          <ProblemSolving
-            onNavigate={navigate}
-          />
-        )}
-
-        {/* DATA EXPLORER */}
-
-        {page === "data" && (
-          <DataExplorer />
-        )}
-
-        {/* METHODOLOGY */}
-
-        {page === "methodology" && (
-          <Methodology />
-        )}
-
-        {isModeling && (
-          <ModelOverview
-            type={page}
-            onNavigate={navigate}
-            transitConfig={transitConfig}
-          />
-        )}
-
-        {isTransit && (
-          <Transit
-            role={page}
-            onNavigate={navigate}
-            config={transitConfig}
-            setConfig={setTransitConfig}
-          />
-        )}
-
+        <Suspense
+          fallback={
+            <div className="px-5 py-16 text-center text-sm text-slate-600" role="status">
+              Memuat halaman...
+            </div>
+          }
+        >
+          {page === "home" && <Home onNavigate={navigate} />}
+          {page === "problems" && <ProblemSolving onNavigate={navigate} />}
+          {page === "data" && <DataExplorer />}
+          {page === "methodology" && <Methodology />}
+          {isModeling && (
+            <ModelOverview
+              type={page}
+              onNavigate={navigate}
+              onReady={markModelingReady}
+              transitConfig={transitConfig}
+            />
+          )}
+          {isTransit && (
+            <Transit
+              role={page}
+              onNavigate={navigate}
+              config={transitConfig}
+              setConfig={setTransitConfig}
+            />
+          )}
+        </Suspense>
       </main>
 
       <Footer
         onNavigate={navigate}
       />
+
+      {modelingIntro && (
+        <IntroLoading
+          onComplete={closeModelingIntro}
+          ready={modelingReady}
+        />
+      )}
 
     </div>
   );

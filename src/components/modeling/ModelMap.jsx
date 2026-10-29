@@ -3,7 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { addTmdNetworkLayer } from "../../data/tmdNetwork";
-import { LocateFixed, Minus, Pause, Play, Plus, Route } from "lucide-react";
+import { createODFlowLayer } from "../../data/odVisualization";
+import {
+  CarFront,
+  LocateFixed,
+  Map as MapIcon,
+  Minus,
+  Network,
+  Pause,
+  Play,
+  Plus,
+  Route,
+} from "lucide-react";
 
 import { MODEL_ZONES } from "../../data/modelEngine";
 import {
@@ -33,7 +44,8 @@ export default function ModelMap({
 
   label,
   compact = false,
-  showTmdLayer = false,
+  displayMode = "all",
+  onDisplayModeChange,
 
   syncView,
   onViewChange,
@@ -60,10 +72,18 @@ export default function ModelMap({
   const viewRef = useRef(onViewChange);
 
   const [playing, setPlaying] = useState(true);
-
-  const [layer, setLayer] = useState("road");
+  const [showOD, setShowOD] = useState(false);
 
   const isBefore = stage === "before";
+  const showTmdLayer = displayMode !== "roads";
+
+  function changeDisplayMode(nextMode) {
+    if (nextMode === "tmd") {
+      setShowOD(false);
+    }
+
+    onDisplayModeChange?.(nextMode);
+  }
 
   // Bagian persiapan jaringan
 
@@ -86,7 +106,7 @@ export default function ModelMap({
   settingsRef.current = {
     isBefore,
     playing,
-    layer,
+    displayMode,
     reference,
   };
 
@@ -264,13 +284,25 @@ export default function ModelMap({
   // Bagian penanda zona
 
   useEffect(() => {
+    const map = mapRef.current;
     const group = zoneLayerRef.current;
 
-    if (!group) {
+    if (!map || !group) {
       return;
     }
 
     group.clearLayers();
+
+    if (displayMode === "tmd") {
+      if (map.hasLayer(group)) {
+        map.removeLayer(group);
+      }
+      return;
+    }
+
+    if (!map.hasLayer(group)) {
+      group.addTo(map);
+    }
 
     for (const zone of MODEL_ZONES) {
       L.marker(
@@ -288,7 +320,7 @@ export default function ModelMap({
         })
         .addTo(group);
     }
-  }, [selectedZone]);
+  }, [displayMode, selectedZone]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -298,6 +330,7 @@ export default function ModelMap({
 
     if (
       !map ||
+      displayMode === "tmd" ||
       !Array.isArray(matrix) ||
       !Array.isArray(model?.matrixBefore)
     ) {
@@ -314,47 +347,57 @@ export default function ModelMap({
           (sum, row) => sum + (Number(row?.[index]) || 0),
           0,
         );
-        const internal = Number(values[index]?.[index]) || 0;
-
         return {
           zone,
           outgoing,
           incoming,
-          activity: Math.max(0, outgoing + incoming - internal),
         };
       });
 
     const totals = calculateActivities(matrix);
-    const baseline = calculateActivities(model.matrixBefore);
     const maximum = Math.max(
       1,
-      ...baseline.map(({ activity }) => activity),
+      ...totals.map(({ incoming }) => incoming),
+    );
+    const strongestOrigins = new Set(
+      [...totals]
+        .sort((a, b) => b.outgoing - a.outgoing)
+        .slice(0, 2)
+        .map(({ zone }) => zone.id),
+    );
+    const strongestDestinations = new Set(
+      [...totals]
+        .sort((a, b) => b.incoming - a.incoming)
+        .slice(0, 2)
+        .map(({ zone }) => zone.id),
     );
     const layer = L.layerGroup();
 
-    for (const { zone, outgoing, incoming, activity } of totals) {
-      const intensity = activity / maximum;
+    for (const { zone, outgoing, incoming } of totals) {
+      const intensity = incoming / maximum;
       const selected = zone.id === selectedZone;
       const color = selected
         ? RED
-        : intensity >= 0.65
-          ? "#E58C32"
-          : "#0F766E";
+        : strongestDestinations.has(zone.id)
+          ? "#2563EB"
+          : strongestOrigins.has(zone.id)
+            ? RED
+            : "#F59E0B";
 
       L.circleMarker([zone.lat, zone.lng], {
         pane: "dmMatActivityPane",
-        radius: 6 + intensity * 14,
+        radius: 18 + 24 * Math.sqrt(intensity),
         color,
-        weight: selected ? 2 : 1,
-        opacity: 0.65,
+        weight: selected ? 3 : 2,
+        opacity: 0.9,
         fillColor: color,
-        fillOpacity: 0.08 + intensity * 0.18,
+        fillOpacity: 0.1,
       })
         .bindTooltip(
           `<strong>${zone.id} · ${zone.name}</strong>` +
             `<br/>Bangkitan: ${Math.round(outgoing).toLocaleString("id-ID")} smp/jam` +
             `<br/>Tarikan: ${Math.round(incoming).toLocaleString("id-ID")} smp/jam` +
-            `<br/>Lingkaran menunjukkan aktivitas MAT relatif, bukan batas wilayah.`,
+            `<br/>Ukuran lingkaran mengikuti tarikan MAT relatif.`,
         )
         .on("click", () => selectRef.current?.(zone.id))
         .addTo(layer);
@@ -372,7 +415,7 @@ export default function ModelMap({
         matActivityLayerRef.current = null;
       }
     };
-  }, [model, isBefore, selectedZone]);
+  }, [model, isBefore, selectedZone, displayMode]);
 
   // Bagian layer jalan dan kendaraan
 
@@ -393,7 +436,7 @@ export default function ModelMap({
 
     vehiclesRef.current = createVehicles(roads, vehiclesRef.current);
 
-    if (layer === "road") {
+    if (displayMode !== "tmd") {
       // Kelompokkan jalan berdasarkan
       // warna supaya tidak membuat
       // ribuan layer individual.
@@ -432,53 +475,37 @@ export default function ModelMap({
       });
     }
 
-    if (layer === "od") {
-      // OD bukan jalan kendaraan.
-      // Hanya muncul ketika dipilih.
-
-      const allPairs = model?.pairs || [];
-      const pairs = allPairs
+    if (showOD && displayMode !== "tmd") {
+      const flows = (model?.pairs || [])
         .map((pair) => ({
-          ...pair,
+          origin: pair.origin,
+          destination: pair.destination,
           flow: isBefore ? pair.before : pair.after,
         }))
-        .filter((pair) => pair.flow > 0)
-        .sort((a, b) => b.flow - a.flow)
-        .slice(0, 20);
-      const maximumFlow = Math.max(
-        1,
-        ...allPairs.map((pair) => pair.before || 0),
+        .filter(
+          ({ origin, destination, flow }) =>
+            destination.id === selectedZone &&
+            origin.id !== selectedZone &&
+            flow > 0,
+        )
+        .map(({ origin, flow }) => ({ origin, value: flow }));
+      const target = MODEL_ZONES.find((zone) => zone.id === selectedZone);
+      const strongestOrigin = flows.reduce(
+        (strongest, flow) =>
+          !strongest || flow.value > strongest.value ? flow : strongest,
+        null,
       );
 
-      for (const pair of pairs) {
-        const focused = pair.origin.id === selectedZone;
-        const intensity = Math.sqrt(pair.flow / maximumFlow);
-
-        L.polyline(
-          [
-            [pair.origin.lat, pair.origin.lng],
-            [pair.destination.lat, pair.destination.lng],
-          ],
-
-          {
-            color: focused
-              ? RED
-              : intensity >= 0.65
-                ? "#E58C32"
-                : "#64748B",
-
-            opacity: focused ? 0.8 : 0.18 + intensity * 0.32,
-
-            weight: focused ? 1.8 + intensity * 2.2 : 0.8 + intensity * 1.5,
-
-            dashArray: "5 8",
-
-            interactive: false,
-          },
+      if (target) {
+        createODFlowLayer(
+          flows,
+          target,
+          strongestOrigin?.origin.id,
+          (value) => Math.round(value).toLocaleString("id-ID"),
         ).addTo(group);
       }
     }
-  }, [roads, layer, isBefore, reference, model, selectedZone]);
+  }, [roads, displayMode, isBefore, reference, model, selectedZone, showOD]);
 
   // Bagian animasi kendaraan
 
@@ -541,7 +568,7 @@ export default function ModelMap({
 
       const settings = settingsRef.current;
 
-      if (settings.layer !== "road") {
+      if (settings.displayMode === "tmd") {
         return;
       }
 
@@ -567,14 +594,6 @@ export default function ModelMap({
         const road = scene.byId.get(car.roadId);
 
         if (!road) {
-          continue;
-        }
-
-        // Jumlah kendaraan After mengikuti proporsi assignment MAT pada ruas.
-
-        const afterRatio = clamp(road.after / Math.max(1, road.before), 0, 1);
-
-        if (after && car.afterSample > afterRatio) {
           continue;
         }
 
@@ -632,7 +651,11 @@ export default function ModelMap({
 
         ctx.save();
 
-        ctx.globalAlpha = clamp(car.alpha, 0, 1);
+        ctx.globalAlpha = clamp(
+          car.alpha * car.scenarioVisibility,
+          0,
+          1,
+        );
 
         ctx.translate(x, y);
         ctx.rotate(angle);
@@ -698,12 +721,12 @@ export default function ModelMap({
   "
       />
 
-      {/* MAP LAYERS */}
+      {/* MAP DISPLAY MODES */}
 
       <div
         className="
-          absolute left-3 top-3 z-[900]
-          flex items-center gap-1
+          absolute left-2 top-2 z-[900] w-fit max-w-[calc(100%-1rem)]
+          flex flex-wrap items-center gap-1
           rounded-xl
           border border-slate-200
           bg-white/95 p-1
@@ -712,46 +735,111 @@ export default function ModelMap({
       >
         <button
           type="button"
-          onClick={() => setLayer("road")}
+          onClick={() => changeDisplayMode("roads")}
+          aria-pressed={displayMode === "roads"}
           className={`
-            rounded-lg px-3 py-2
+            flex items-center gap-1.5 rounded-lg px-2.5 py-2
             text-[11px] font-semibold
             transition-colors
             ${
-              layer === "road"
+              displayMode === "roads"
                 ? "bg-[#B91C1C] text-white"
                 : "text-slate-600 hover:bg-slate-100"
             }
           `}
         >
-          Arus jalan
+          <CarFront size={14} />
+          Jaringan Jalan
         </button>
 
         <button
           type="button"
-          onClick={() => setLayer("od")}
+          onClick={() => changeDisplayMode("tmd")}
+          aria-pressed={displayMode === "tmd"}
           className={`
             flex items-center gap-1
-            rounded-lg px-3 py-2
+            rounded-lg px-2.5 py-2
             text-[11px] font-semibold
             transition-colors
             ${
-              layer === "od"
+              displayMode === "tmd"
                 ? "bg-[#B91C1C] text-white"
                 : "text-slate-600 hover:bg-slate-100"
             }
           `}
         >
-          <Route size={13} />
-          OD
+          <Network size={14} />
+          Jaringan TMD
+        </button>
+
+        <button
+          type="button"
+          onClick={() => changeDisplayMode("all")}
+          aria-pressed={displayMode === "all"}
+          className={`
+            flex items-center gap-1.5 rounded-lg px-2.5 py-2
+            text-[11px] font-semibold transition-colors
+            ${
+              displayMode === "all"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }
+          `}
+        >
+          <MapIcon size={14} />
+          Denpasar Bali
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowOD((visible) => !visible)}
+          disabled={displayMode === "tmd"}
+          aria-pressed={showOD}
+          title={
+            displayMode === "tmd"
+              ? "OD tersedia pada mode Jaringan Jalan dan Denpasar Bali"
+              : undefined
+          }
+          className={`
+            flex items-center gap-1.5 rounded-lg px-2.5 py-2
+            text-[11px] font-semibold transition-colors
+            disabled:cursor-not-allowed disabled:opacity-50
+            ${
+              showOD
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }
+          `}
+        >
+          <Route size={14} />
+          Tampilkan OD
         </button>
       </div>
+
+      {displayMode !== "tmd" && (
+        <div className="absolute left-3 top-32 z-[900] flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[10px] font-medium text-slate-600 shadow-sm">
+          {[
+            ["#0F766E", "Rendah"],
+            ["#D3AD4C", "Sedang"],
+            ["#E58C32", "Tinggi"],
+            ["#B91C1C", "Sangat padat"],
+          ].map(([color, label]) => (
+            <span key={label} className="flex items-center gap-1.5">
+              <span
+                className="h-0.5 w-4 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* ZOOM CONTROLS */}
 
       <div
         className="
-          absolute right-3 top-3 z-[900]
+          absolute right-3 top-24 z-[900]
           flex flex-col overflow-hidden
           rounded-xl border border-slate-200
           bg-white/95 shadow-sm
@@ -840,16 +928,9 @@ export default function ModelMap({
         {label || (isBefore ? "SEBELUM" : "SESUDAH")}
       </span>
 
-      {layer === "road" && (
-        <p className="pointer-events-none absolute bottom-14 left-3 z-[900] max-w-[280px] rounded-lg bg-white/90 px-2.5 py-1.5 text-[10px] leading-4 text-slate-500 shadow-sm">
-          Ilustrasi kepadatan dan komposisi kendaraan; belum dikalibrasi
-          dengan survei lapangan.
-        </p>
-      )}
-
       {/* NO NETWORK */}
 
-      {!roads.length && layer === "road" && (
+      {!roads.length && displayMode !== "tmd" && (
         <div
           className="
             pointer-events-none
@@ -868,22 +949,6 @@ export default function ModelMap({
 
       {/* OD NOTE */}
 
-      {layer === "od" && (
-        <div
-          className="
-            pointer-events-none
-            absolute bottom-14 left-3
-            z-[900]
-            max-w-[250px]
-            rounded-lg bg-white/95
-            px-3 apy-2
-            text-[10px] text-slate-600
-            shadow-sm
-          "
-        >
-          Garis OD menunjukkan hubungan asal–tujuan, bukan lintasan mobil.
-        </div>
-      )}
     </div>
   );
 }

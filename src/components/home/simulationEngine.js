@@ -131,6 +131,7 @@ export function drawVehicle(ctx, vehicle, scale) {
 function createVehicle(edgeIndex, index, count, edge) {
   const seed = edgeIndex * 997 + index * 73;
   const roadClass = clamp(edge[3] | 0, 0, 8);
+  const startT = (index + 0.5) / count;
 
   const roll = hash(seed);
 
@@ -155,7 +156,9 @@ function createVehicle(edgeIndex, index, count, edge) {
 
   return {
     edge: edgeIndex,
-    t: (index + 0.5) / count,
+    startEdge: edgeIndex,
+    startT,
+    t: startT,
     type,
     color: VEHICLE_COLORS[
       Math.floor(hash(seed + 3) * VEHICLE_COLORS.length)
@@ -169,6 +172,9 @@ function createVehicle(edgeIndex, index, count, edge) {
     desiredSpeed,
     speed: desiredSpeed * 0.84,
     minGap: 2 + hash(seed + 38) * 2,
+    timeHeadway: type === "motor" ? 1.25 : 1.5,
+    maxAcceleration: type === "motor" ? 1.5 : 1.2,
+    comfortableDeceleration: type === "bus" ? 1.8 : 2,
     visibility: hash(seed + 823),
     seed,
     status: "moving",

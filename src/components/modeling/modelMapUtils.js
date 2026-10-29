@@ -1,4 +1,5 @@
 import L from "leaflet";
+import { updateIdm } from "../../data/vehicleDynamics.js";
 
 export const RED = "#B91C1C";
 export const TEAL = "#0F766E";
@@ -374,9 +375,18 @@ export function createVehicles(roads, previous = []) {
           saved && roadIds.has(saved.roadId)
             ? saved.distance
             : road.total * ((i + 0.5) / Math.max(count, 1)),
+        spawnDistance:
+          saved?.spawnDistance ??
+          road.total * ((i + 0.5) / Math.max(count, 1)),
 
         speed: saved?.speed ?? 4,
         alpha: saved?.alpha ?? 0.3,
+        scenarioVisibility: saved?.scenarioVisibility ?? 1,
+        length: kind === "motor" ? 2 : kind === "bus" ? 10 : 4.5,
+        minGap: kind === "motor" ? 1.5 : 2.5,
+        timeHeadway: kind === "motor" ? 1.3 : 1.6,
+        maxAcceleration: kind === "motor" ? 1.5 : 1.2,
+        comfortableDeceleration: kind === "bus" ? 1.8 : 2,
 
         state: saved?.state ?? "moving",
 
@@ -445,13 +455,15 @@ export function chooseNextRoad(current, scene) {
 // Bagian simulasi kendaraan
 
 export function advanceVehicles(vehicles, scene, dt, after, reference) {
+  const vehiclesByRoad = new Map();
+
   for (const car of vehicles) {
     if (car.state === "waiting") {
       car.cooldown -= dt;
 
       if (car.cooldown <= 0) {
         car.roadId = car.originalRoadId;
-        car.distance = 0;
+        car.distance = car.spawnDistance;
         car.alpha = 0;
         car.speed = 2;
         car.state = "moving";
@@ -471,58 +483,96 @@ export function advanceVehicles(vehicles, scene, dt, after, reference) {
       continue;
     }
 
-    let road = scene.byId.get(car.roadId);
+    const road = scene.byId.get(car.roadId);
 
     if (!road) {
       continue;
     }
 
-    const flow = after ? road.after : road.before;
-
-    const pressure = clamp(flow / Math.max(reference, 1), 0, 2);
-
-    // Kecepatan visual dari tekanan arus.
-    // Bukan kecepatan hasil pengukuran.
-
-    const targetSpeed = clamp(
-      13 / (1 + Math.pow(pressure * 1.6, 1.3)),
-      1.5,
-      13,
+    car.alpha = Math.min(1, car.alpha + dt * 1.8);
+    const afterRatio = clamp(road.after / Math.max(1, road.before), 0, 1);
+    const targetVisibility = !after || car.afterSample < afterRatio ? 1 : 0;
+    car.scenarioVisibility += clamp(
+      targetVisibility - car.scenarioVisibility,
+      -dt * 1.8,
+      dt * 1.8,
     );
 
-    car.speed += clamp(targetSpeed - car.speed, -3 * dt, 2.5 * dt);
+    if (!vehiclesByRoad.has(road.id)) {
+      vehiclesByRoad.set(road.id, []);
+    }
 
-    car.alpha = Math.min(1, car.alpha + dt * 1.8);
+    vehiclesByRoad.get(road.id).push(car);
+  }
 
-    let remaining = car.speed * dt * 2.5;
+  for (const [roadId, group] of vehiclesByRoad) {
+    group.sort((a, b) => b.distance - a.distance);
+
+    for (let index = 0; index < group.length; index++) {
+      const car = group[index];
+      const leader = index > 0 ? group[index - 1] : null;
+      let road = scene.byId.get(roadId);
+
+      if (!road) {
+        continue;
+      }
+
+      const flow = after ? road.after : road.before;
+      const pressure = clamp(flow / Math.max(reference, 1), 0, 2);
+      const targetSpeed = clamp(
+        13 / (1 + Math.pow(pressure * 1.6, 1.3)),
+        1.5,
+        13,
+      );
+      const leaderGap = leader
+        ? leader.distance - car.distance -
+          (leader.length + car.length) / 2 - car.minGap
+        : 10000;
+      const movement = updateIdm(
+        car,
+        targetSpeed,
+        leader?.speed,
+        leaderGap,
+        dt,
+      );
+
+      car.speed = movement.speed;
+
+      const safeDistance = leader
+        ? Math.max(0, leader.distance - car.distance -
+            (leader.length + car.length) / 2 - car.minGap)
+        : Infinity;
+      let remaining = Math.min(movement.distance, safeDistance);
 
     // Ketika mencapai ujung ruas,
     // lanjut ke ruas yang tersambung.
-    for (let hop = 0; hop < 8; hop++) {
-      const available = road.total - car.distance;
+      for (let hop = 0; hop < 8 && remaining > 0; hop++) {
+        const available = road.total - car.distance;
 
-      if (remaining < available) {
-        car.distance += remaining;
-        break;
-      }
+        if (remaining < available) {
+          car.distance += remaining;
+          break;
+        }
 
-      remaining -= Math.max(available, 0);
+        remaining -= Math.max(available, 0);
 
-      const next = chooseNextRoad(road, scene);
+        const next = chooseNextRoad(road, scene);
 
-      if (!next) {
-        car.distance = road.total - 0.001;
+        if (!next) {
+          car.distance = road.total - 0.001;
 
-        car.state = "leaving";
-        break;
-      }
+          car.state = "leaving";
+          car.speed = 0;
+          break;
+        }
 
-      car.roadId = next.id;
-      car.distance = 0;
-      road = next;
+        car.roadId = next.id;
+        car.distance = 0;
+        road = next;
 
-      if (remaining <= 0) {
-        break;
+        if (remaining <= 0) {
+          break;
+        }
       }
     }
   }

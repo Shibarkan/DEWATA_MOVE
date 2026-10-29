@@ -172,7 +172,7 @@ export default function Header({ activePage = "home", onNavigate }) {
         data-scrolled={scrolled}
         className={`
           tmd-header dmh-header
-          fixed left-1/2 z-50
+          fixed left-1/2 z-[10000]
           -translate-x-1/2
           transition-[top,width,max-width,border-radius,box-shadow]
           duration-500

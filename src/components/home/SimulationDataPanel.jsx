@@ -11,8 +11,6 @@ export default function SimulationDataPanel({
   setDensity,
   showHeat,
   setShowHeat,
-  showOD,
-  setShowOD,
   showHotspots,
   setShowHotspots,
   zones,
@@ -132,16 +130,6 @@ export default function SimulationDataPanel({
                 className="accent-[#B91C1C]"
               />
               Intensitas Ruas (Model)
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showOD}
-                onChange={(event) => setShowOD(event.target.checked)}
-                className="accent-[#B91C1C]"
-              />
-              Garis OD Terbesar
             </label>
 
             <label className="flex items-center gap-2">

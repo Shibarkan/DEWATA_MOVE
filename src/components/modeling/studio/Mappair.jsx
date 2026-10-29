@@ -94,12 +94,12 @@ export default function MapPair({
       <p className="mt-3 text-[11px] leading-6 text-slate-500">
         Geser atau zoom salah satu peta: kamera peta
         lainnya mengikuti posisi yang sama. Setiap peta
-        memiliki tombol Jaringan TMD sendiri sehingga
-        mode tampilannya dapat dipilih secara terpisah.
+        memiliki pilihan Jaringan Jalan, Jaringan TMD,
+        dan Denpasar Bali secara terpisah.
         Arus ruas, garis OD, dan ukuran lingkaran zona
         mengikuti MAT pada skenario masing-masing.
-        Lingkaran menunjukkan aktivitas bangkitan dan
-        tarikan relatif, bukan batas wilayah.
+        Lingkaran menonjolkan zona dengan tarikan MAT
+        terbesar, bukan batas wilayah.
         Kendaraan serta warna ruas adalah ilustrasi
         relatif, bukan V/C terukur.
       </p>

@@ -420,22 +420,50 @@ function busIcon(color, routeId) {
         display:flex;
         align-items:center;
         justify-content:center;
-        gap:2px;
-        width:30px;
-        height:23px;
+        gap:3px;
+        width:36px;
+        height:24px;
         border:1.5px solid ${color};
-        border-radius:7px;
+        border-radius:8px;
         background:#FFFFFF;
         box-shadow:0 2px 7px #0f172a35;
-        font-size:12px;
         white-space:nowrap;
       ">
-        <span>🚌</span>
-        <b style="font-size:9px;color:${color}">${routeId}</b>
+        <span style="
+          position:relative;
+          display:block;
+          width:18px;
+          height:13px;
+          border-radius:4px 4px 3px 3px;
+          background:#243244;
+          box-shadow:inset 0 -3px 0 ${color};
+        ">
+          <span style="
+            position:absolute;
+            left:3px;
+            right:3px;
+            top:2px;
+            height:4px;
+            border-radius:2px;
+            background:linear-gradient(90deg,#9FC6DA 0 43%,#243244 43% 55%,#9FC6DA 55%);
+          "></span>
+          <span style="
+            position:absolute;
+            left:3px;
+            bottom:-2px;
+            width:4px;
+            height:4px;
+            border:1px solid #FFFFFF;
+            border-radius:50%;
+            background:#17202E;
+            box-shadow:9px 0 0 -1px #17202E,9px 0 0 0 #FFFFFF;
+          "></span>
+        </span>
+        <b style="font-size:9px;line-height:1;color:${color}">${routeId}</b>
       </span>
     `,
-    iconSize: [30, 23],
-    iconAnchor: [15, 11],
+    iconSize: [36, 24],
+    iconAnchor: [18, 12],
   });
 }
 
