@@ -414,6 +414,109 @@ function ProgressBars({ items, max, suffix = "", color = "#b91c1c" }) {
   );
 }
 
+function FuelComparisonChart({ selectedYear, selectedFuel, onFuelChange }) {
+  const yearIndex = YEARS.indexOf(selectedYear);
+  const items = Object.entries(FUELS)
+    .map(([key, fuel]) => ({
+      key,
+      name: fuel.name,
+      value: fuel.values[yearIndex],
+    }))
+    .sort((a, b) => b.value - a.value);
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
+  const maxLog = Math.log10(maxValue + 1);
+  const ticks = [
+    0,
+    ...[1, 10, 100, 1000, 10000, 100000, 1000000].filter(
+      (tick) => tick < maxValue,
+    ),
+    maxValue,
+  ];
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">
+            Perbandingan konsumsi antarjenis BBM
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Tahun {selectedYear} · pilih jenis BBM untuk melihat trennya
+          </p>
+        </div>
+        <span className="text-[11px] font-medium text-slate-500">
+          Skala logaritmik · kL
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {items.map((item) => {
+          const width =
+            item.value > 0 ? (Math.log10(item.value + 1) / maxLog) * 100 : 0;
+          const selected = item.key === selectedFuel;
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onFuelChange(item.key)}
+              aria-pressed={selected}
+              aria-label={`${item.name}: ${fmt(item.value, 0)} kiloliter pada ${selectedYear}`}
+              className="grid w-full grid-cols-[7rem_minmax(0,1fr)_4.5rem] items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50"
+            >
+              <span
+                className={`truncate text-xs ${
+                  selected ? "font-bold text-orange-700" : "text-slate-600"
+                }`}
+              >
+                {item.name}
+              </span>
+              <span className="relative h-3 overflow-hidden rounded-full bg-slate-100">
+                <span
+                  className={`block h-full rounded-full ${
+                    selected ? "bg-orange-600" : "bg-slate-400"
+                  }`}
+                  style={{ width: `${width}%` }}
+                />
+              </span>
+              <span className="min-w-[4.5rem] text-right text-xs font-semibold tabular-nums text-slate-800">
+                {fmt(item.value, 0)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="ml-[calc(7rem+1.25rem)] mr-20 mt-3 border-t border-slate-200 pt-1.5">
+        <div className="relative h-5 text-[10px] text-slate-400">
+          {ticks.map((tick, index) => (
+            <span
+              key={`${tick}-${index}`}
+              className={`absolute ${
+                index === 0
+                  ? "translate-x-0"
+                  : index === ticks.length - 1
+                    ? "-translate-x-full"
+                    : "-translate-x-1/2"
+              }`}
+              style={{
+                left: `${(Math.log10(tick + 1) / maxLog) * 100}%`,
+              }}
+            >
+              {fmt(tick, 0)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-5 text-slate-400">
+        Panjang batang memakai skala logaritmik agar nilai kecil dan besar
+        terlihat bersama; angka di kanan tetap menunjukkan nilai asli. Nilai
+        0 mengikuti tabel sumber.
+      </p>
+    </div>
+  );
+}
+
 /*
  * Diagram donat memakai CSS.
  */
@@ -552,6 +655,13 @@ export default function DataExplorer() {
   const selectedGas = EMISSION[gasType];
 
   const corridor = TMD.find((item) => item.id === selectedCorridor) || TMD[0];
+  const corridorMaximum =
+    tmdMetric === "lf"
+      ? 100
+      : Math.max(...TMD.map((item) => item.passengers));
+  const sortedCorridors = [...TMD].sort(
+    (a, b) => b[tmdMetric] - a[tmdMetric],
+  );
 
   const grk2024 = EMISSION.grk.values[5];
   const scenarioGRK = grk2024 * (1 - reduction / 100);
@@ -950,6 +1060,14 @@ export default function DataExplorer() {
               </div>
             </div>
 
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <FuelComparisonChart
+                selectedYear={fuelYear}
+                selectedFuel={fuelType}
+                onFuelChange={setFuelType}
+              />
+            </div>
+
             <Explanation>
               Pilih jenis BBM untuk membandingkan perubahan dalam jenis yang
               sama. Nilai nol mengikuti tabel sumber dan belum tentu membuktikan
@@ -1039,21 +1157,34 @@ export default function DataExplorer() {
                 </button>
               </div>
 
+              <div className="mb-2 ml-1 flex justify-between text-[10px] text-slate-400 sm:ml-0">
+                <span>0</span>
+                <span>
+                  {tmdMetric === "lf"
+                    ? "50%"
+                    : fmt(corridorMaximum / 2, 0)}
+                </span>
+                <span>
+                  {tmdMetric === "lf"
+                    ? "100%"
+                    : fmt(corridorMaximum, 0)}
+                </span>
+              </div>
+
               <div className="space-y-3">
-                {TMD.map((item) => {
+                {sortedCorridors.map((item) => {
                   const value = item[tmdMetric];
-
-                  const maximum =
-                    tmdMetric === "lf"
-                      ? 100
-                      : Math.max(...TMD.map((x) => x.passengers));
-
                   const selected = item.id === selectedCorridor;
 
                   return (
                     <button
                       key={item.id}
+                      type="button"
                       onClick={() => setSelectedCorridor(item.id)}
+                      aria-pressed={selected}
+                      aria-label={`Koridor ${item.id}, ${item.route}: ${fmt(value)}${
+                        tmdMetric === "lf" ? "%" : " penumpang"
+                      }`}
                       className={`w-full rounded-xl border p-3 text-left transition sm:p-4 ${
                         selected
                           ? "border-red-300 bg-red-50"
@@ -1069,15 +1200,24 @@ export default function DataExplorer() {
                         </span>
                       </div>
 
-                      <div className="h-2.5 rounded-full bg-slate-200">
+                      <div className="relative h-3 overflow-hidden rounded-full bg-slate-200">
                         <div
                           className="h-full rounded-full bg-red-700 transition-all"
                           style={{
-                            width: `${clamp((value / maximum) * 100, 0, 100)}%`,
+                            width: `${clamp(
+                              (value / corridorMaximum) * 100,
+                              0,
+                              100,
+                            )}%`,
+                          }}
+                        />
+                        <div
+                          className="pointer-events-none absolute inset-y-0 border-l border-dashed border-slate-500/60"
+                          style={{
+                            left: "50%",
                           }}
                         />
                       </div>
-
                       <p className="mt-2 text-[11px] text-slate-500">
                         {item.route}
                       </p>

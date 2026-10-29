@@ -50,9 +50,6 @@ const researchFocus = [
 export default function Home({ onNavigate }) {
   return (
     <div className="overflow-hidden bg-white text-slate-900">
-      {/* ==================================
-          HERO
-      ================================== */}
 
       <section className="border-b border-slate-100">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.2fr_0.8fr] lg:gap-20 lg:pb-28 lg:pt-28">
@@ -144,10 +141,6 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* ==================================
-          INTRODUCTION
-      ================================== */}
-
       <section className="px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
           <Reveal>
@@ -200,10 +193,6 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* ==================================
-          NETWORK PREVIEW
-      ================================== */}
-
       <section className="bg-[#F8F9FA] px-4 py-20 sm:px-6 sm:py-28">
         <div className="mx-auto max-w-7xl">
           <Reveal>
@@ -242,10 +231,6 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* ==================================
-          RESEARCH FOCUS
-      ================================== */}
-
       <section className="px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">
           <Reveal>
@@ -262,7 +247,7 @@ export default function Home({ onNavigate }) {
 
           <div className="grid gap-0 border-t border-slate-200 md:grid-cols-3">
             {researchFocus.map((item, index) => (
-              <Reveal key={item.number} delay={index * 100}>
+              <Reveal key={item.title} delay={index * 100}>
                 <div className="h-full border-b border-slate-200 py-8 md:border-r md:px-7 md:py-9 md:first:pl-0 md:last:border-r-0">
                   <p className="mb-8 text-sm font-bold text-[#B91C1C]">
                     {item.number}
@@ -281,10 +266,6 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
       </section>
-
-      {/* ==================================
-          MODELING OVERVIEW
-      ================================== */}
 
       <section className="border-t border-slate-200 bg-white px-5 py-20 sm:px-8 sm:py-28">
         <div className="mx-auto max-w-7xl">

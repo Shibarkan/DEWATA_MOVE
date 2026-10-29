@@ -1,11 +1,9 @@
 
 import L from "leaflet";
 
-// ======================================================
 // TRANS METRO DEWATA
 // Referensi jaringan: TMD-Transit Network Map Denpasar
 // Rute jalan dicocokkan melalui OSRM / OpenStreetMap.
-// ======================================================
 
 export const TMD_CORRIDORS = [
   {
@@ -142,13 +140,11 @@ export const TMD_CORRIDORS = [
   },
 ];
 
-// ======================================================
 // TITIK UTAMA DAN TERMINAL
 //
 // Ini bukan daftar lengkap semua halte resmi.
 // Koordinat halte perantara yang belum diverifikasi
 // harus dicocokkan lagi dengan data GIS / GTFS resmi.
-// ======================================================
 
 export const TMD_STOPS = [
   {
@@ -225,9 +221,7 @@ export const TMD_BOUNDS = [
   [-8.508, 115.300],
 ];
 
-// ======================================================
 // ROAD ROUTING
-// ======================================================
 
 const ROUTING_APIS = [
   "https://router.project-osrm.org/route/v1/driving/",
@@ -293,13 +287,11 @@ function pointAt(points, info, progress) {
   ];
 }
 
-// ======================================================
 // AMBIL GEOMETRI JALAN
 //
 // radiuses=unlimited membantu titik waypoint yang
 // tidak tepat di tengah jalan agar tetap dapat di-snap.
 // Jika routing gagal, garis waypoint ditampilkan putus-putus.
-// ======================================================
 
 async function fetchRoadGeometry(corridor) {
   const locations = corridor.waypoints
@@ -397,9 +389,7 @@ function loadAllGeometry() {
   return sharedGeometryPromise;
 }
 
-// ======================================================
 // ICON HALTE
-// ======================================================
 
 function stopIcon() {
   return L.divIcon({
@@ -420,9 +410,7 @@ function stopIcon() {
   });
 }
 
-// ======================================================
 // ICON BUS
-// ======================================================
 
 function busIcon(color, routeId) {
   return L.divIcon({
@@ -451,10 +439,8 @@ function busIcon(color, routeId) {
   });
 }
 
-// ======================================================
 // LAYER JARINGAN TMD
 // Kompatibel dengan ModelMap dan SimulationPreview.
-// ======================================================
 
 export function addTmdNetworkLayer(
   map,
@@ -478,9 +464,7 @@ export function addTmdNetworkLayer(
 
   const layer = L.layerGroup().addTo(map);
 
-  // ----------------------------------------------------
   // KORIDOR DAN BUS
-  // ----------------------------------------------------
 
   const states = TMD_CORRIDORS.map(
     (corridor, index) => {
@@ -540,9 +524,7 @@ export function addTmdNetworkLayer(
     }
   );
 
-  // ----------------------------------------------------
   // HALTE DAN TERMINAL UTAMA
-  // ----------------------------------------------------
 
   if (showStops) {
     for (const stop of TMD_STOPS) {
@@ -566,9 +548,7 @@ export function addTmdNetworkLayer(
     }
   }
 
-  // ----------------------------------------------------
   // ANIMASI BUS
-  // ----------------------------------------------------
 
   let destroyed = false;
   let raf = 0;
@@ -618,9 +598,7 @@ export function addTmdNetworkLayer(
 
   raf = window.requestAnimationFrame(animate);
 
-  // ----------------------------------------------------
   // GANTI WAYPOINT DENGAN GEOMETRI JALAN OSRM
-  // ----------------------------------------------------
 
   const ready = loadAllGeometry()
     .then((geometries) => {
@@ -663,9 +641,7 @@ export function addTmdNetworkLayer(
       );
     });
 
-  // ----------------------------------------------------
   // CLEANUP
-  // ----------------------------------------------------
 
   return {
     layer,

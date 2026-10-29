@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Clock3,
@@ -31,8 +30,7 @@ const policies = [
       "Mengalihkan sebagian permintaan dari periode puncak menuju periode di luar puncak.",
     model:
       "Time-sliced OD matrix, temporal demand distribution, dan traffic reassignment.",
-    indicator:
-      "Perubahan volume jam puncak, V/C ratio, dan waktu tempuh.",
+    indicator: "Perubahan volume jam puncak, V/C ratio, dan waktu tempuh.",
     required:
       "Profil perjalanan menurut waktu dan besaran respons perubahan jadwal.",
   },
@@ -157,7 +155,6 @@ export default function ProblemSolving({ onNavigate }) {
 
   return (
     <div className="bg-white">
-
       {/* PAGE HEADER */}
       <section className="px-5 pb-16 pt-20 text-center sm:pt-28">
         <Reveal>
@@ -169,16 +166,13 @@ export default function ProblemSolving({ onNavigate }) {
             <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">
               Rethinking Urban
               <br />
-              <span className="text-[#B91C1C]">
-                Transportation.
-              </span>
+              <span className="text-[#B91C1C]">Transportation.</span>
             </h1>
 
             <p className="mx-auto mt-7 max-w-2xl text-sm leading-8 text-slate-500 sm:text-base">
-              Mengidentifikasi persoalan mobilitas,
-              memahami kemungkinan akar penyebabnya,
-              dan menyusun intervensi Transport Demand
-              Management yang dapat diuji secara ilmiah.
+              Mengidentifikasi persoalan mobilitas, memahami kemungkinan akar
+              penyebabnya, dan menyusun intervensi Transport Demand Management
+              yang dapat diuji secara ilmiah.
             </p>
           </div>
         </Reveal>
@@ -194,10 +188,6 @@ export default function ProblemSolving({ onNavigate }) {
                   key={stage}
                   className="rounded-2xl border border-slate-200 bg-[#FAFAFA] p-4"
                 >
-                  <p className="text-xs font-black text-[#B91C1C]">
-                    0{index + 1}
-                  </p>
-
                   <p className="mt-3 text-xs font-semibold text-slate-800 sm:text-sm">
                     {stage}
                   </p>
@@ -222,8 +212,8 @@ export default function ProblemSolving({ onNavigate }) {
               </h2>
 
               <p className="mt-4 text-sm leading-7 text-slate-500">
-                Pilih kebijakan untuk membuka mekanisme,
-                formula pemodelan, dan kebutuhan data.
+                Pilih kebijakan untuk membuka mekanisme, formula pemodelan, dan
+                kebutuhan data.
               </p>
             </div>
           </Reveal>
@@ -245,11 +235,8 @@ export default function ProblemSolving({ onNavigate }) {
               return (
                 <Reveal key={policy.id} delay={(index % 2) * 100}>
                   <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white transition-all duration-300 hover:border-red-200 hover:shadow-lg">
-
                     <button
-                      onClick={() =>
-                        setExpanded(isOpen ? null : policy.id)
-                      }
+                      onClick={() => setExpanded(isOpen ? null : policy.id)}
                       aria-expanded={isOpen}
                       className="flex w-full items-center gap-4 p-6 text-left sm:p-8"
                     >
@@ -316,30 +303,30 @@ export default function ProblemSolving({ onNavigate }) {
       </section>
 
       {/* INTEGRATION */}
-      <section className="px-5 py-24 sm:px-8">
+      <section className="px-5 py-16 sm:px-8">
         <Reveal>
-          <div className="mx-auto max-w-5xl rounded-[32px] bg-[#B91C1C] p-8 text-white sm:p-14">
-            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-red-100">
-              Integrated TDM Strategy
-            </p>
+          <div className="mx-auto flex max-w-5xl flex-col gap-6 rounded-[28px] bg-[#B91C1C] p-7 text-white sm:p-10 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-red-100">
+                Strategi TDM Terpadu
+              </p>
 
-            <h2 className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
-              One City. Multiple Interventions.
-              One Integrated Model.
-            </h2>
+              <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
+                Satu Kota, Satu Strategi Terpadu.
+              </h2>
 
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-red-100">
-              Kebijakan pengendalian kendaraan pribadi
-              harus diintegrasikan dengan peningkatan
-              layanan TMD, feeder, aksesibilitas,
-              dan pengelolaan permintaan perjalanan.
-            </p>
+              <p className="mt-3 text-sm leading-6 text-red-100">
+                Padukan pengendalian kendaraan pribadi dengan layanan TMD,
+                feeder, aksesibilitas, dan pengelolaan perjalanan.
+              </p>
+            </div>
 
             <button
+              type="button"
               onClick={() => onNavigate("comparison")}
-              className="mt-9 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-[#B91C1C] transition-transform hover:-translate-y-1"
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-white px-5 py-3 text-sm font-bold text-[#B91C1C] transition-transform hover:-translate-y-1 lg:self-center"
             >
-              Explore Before–After Framework
+              Go to Comparison
               <ArrowRight size={17} />
             </button>
           </div>

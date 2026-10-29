@@ -5,10 +5,6 @@ import AnimatedBus from "./AnimatedBus";
 
 import { ModelingDropdown, ModelingMobileLinks } from "../ModelingDropdown";
 
-/* ==========================================
-   DEWATAMOVE 2041 — BALI HERITAGE HEADER
-========================================== */
-
 const primaryLinks = [
   { id: "home", label: "Beranda" },
   { id: "problems", label: "Solusi TDM" },
@@ -29,45 +25,37 @@ const groups = [
   },
 ];
 
-/* ==========================================
-   DECORATIVE BALI MANDALA
-========================================== */
-
-function BaliHeaderMandala() {
+// Motif jalur transportasi dekoratif
+function HeaderRoutePattern() {
   return (
-    <svg viewBox="0 0 180 180" fill="none" aria-hidden="true">
-      <circle cx="90" cy="90" r="78" stroke="currentColor" strokeWidth="1" />
-
-      <circle cx="90" cy="90" r="60" stroke="currentColor" strokeWidth="0.8" />
-
-      <circle cx="90" cy="90" r="26" stroke="currentColor" />
-
-      {Array.from({ length: 12 }).map((_, i) => (
-        <g key={i} transform={`rotate(${i * 30} 90 90)`}>
-          <path d="M90 14 Q105 37 90 53 Q75 37 90 14Z" stroke="currentColor" />
-          <path d="M90 53 L90 66" stroke="currentColor" />
-        </g>
-      ))}
-
-      {Array.from({ length: 8 }).map((_, i) => (
-        <ellipse
-          key={i}
-          cx="90"
-          cy="75"
-          rx="8"
-          ry="16"
-          transform={`rotate(${i * 45} 90 90)`}
-          stroke="currentColor"
-          strokeWidth="0.8"
-        />
-      ))}
+    <svg viewBox="0 0 220 140" fill="none" aria-hidden="true">
+      <path
+        d="M-12 104C24 104 31 68 67 68H91C119 68 124 105 153 105H181C204 105 207 79 232 79"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M-10 118C30 118 39 82 69 82H88C112 82 119 119 154 119H184C211 119 215 94 231 94"
+        stroke="currentColor"
+        strokeWidth="0.8"
+      />
+      <path
+        d="M17 29H54C74 29 77 48 94 48H126C143 48 148 28 168 28H211"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
+      <path
+        d="M112 48V68M153 105V119M67 68V82"
+        stroke="currentColor"
+        strokeWidth="0.8"
+      />
+      <circle cx="54" cy="29" r="2.5" fill="currentColor" />
+      <circle cx="94" cy="48" r="2.5" fill="currentColor" />
+      <circle cx="153" cy="105" r="2.5" fill="currentColor" />
+      <circle cx="184" cy="119" r="2.5" fill="currentColor" />
     </svg>
   );
 }
-
-/* ==========================================
-   MAIN COMPONENT
-========================================== */
 
 export default function Header({ activePage = "home", onNavigate }) {
   const [scrolled, setScrolled] = useState(false);
@@ -208,12 +196,14 @@ export default function Header({ activePage = "home", onNavigate }) {
           aria-hidden="true"
         />
 
-        {/* BALI MANDALA */}
+        {/* POLA JALUR TRANSPORTASI */}
         <div
-          className="dmh-header-mandala pointer-events-none absolute -right-5 -top-16 z-0 h-40 w-40 sm:right-[20%]"
+          className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[inherit]"
           aria-hidden="true"
         >
-          <BaliHeaderMandala />
+          <div className="dmh-header-route absolute right-[18%] top-0 h-full w-44">
+            <HeaderRoutePattern />
+          </div>
         </div>
 
         {/* ANIMATED BUS ORBIT */}
@@ -233,9 +223,6 @@ export default function Header({ activePage = "home", onNavigate }) {
             }
           `}
         >
-          {/* =================================
-              BRAND
-          ================================= */}
 
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <button
@@ -256,10 +243,6 @@ export default function Header({ activePage = "home", onNavigate }) {
               </div>
             </button>
           </div>
-
-          {/* =================================
-              DESKTOP NAVIGATION
-          ================================= */}
 
           <nav
             aria-label="Navigasi utama"
@@ -317,10 +300,6 @@ export default function Header({ activePage = "home", onNavigate }) {
             ))}
           </nav>
 
-          {/* =================================
-              MOBILE MENU BUTTON
-          ================================= */}
-
           <button
             type="button"
             onClick={() => {
@@ -335,10 +314,6 @@ export default function Header({ activePage = "home", onNavigate }) {
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
-
-        {/* =================================
-            MOBILE DROPDOWN
-        ================================= */}
 
         {mobileOpen && (
           <div

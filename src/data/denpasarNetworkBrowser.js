@@ -46,9 +46,7 @@ const ZONE_LOOKUP = Object.fromEntries(
   ZONES.map((zone) => [zone.id, zone])
 );
 
-// ========================================
 // MAT 2026 - DATA TOR
-// ========================================
 
 const MAT = [
   [1014,3349,5676,146,434,573,495,188,1236,396,149,90,414],
@@ -71,9 +69,7 @@ const MAT_TOTAL = MAT.flat().reduce(
   0
 );
 
-// ========================================
 // KORIDOR PERJALANAN
-// ========================================
 
 // Urutan berikut menjadi waypoint OSRM.
 // Waypoint terakhir kembali ke titik awal.
@@ -111,9 +107,7 @@ const ROUTE_LOOPS = [
   ],
 ];
 
-// ========================================
 // ROUTING SERVICES
-// ========================================
 
 const API = [
   "https://router.project-osrm.org/route/v1/driving/",
@@ -132,9 +126,7 @@ const TIME_TO_LIVE_MS =
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-// ========================================
 // GEOMETRY HELPERS
-// ========================================
 
 function meters(a, b) {
   const lat =
@@ -190,9 +182,7 @@ function distancePointToLineKm(
   );
 }
 
-// ========================================
 // PRIORITAS OD TOR
-// ========================================
 
 const HEAVY_OD = [];
 
@@ -222,9 +212,7 @@ HEAVY_OD.sort(
 
 const TOP_OD = HEAVY_OD.slice(0, 16);
 
-// ========================================
 // ILUSTRATIVE TRAFFIC PRESSURE
-// ========================================
 
 // Memberikan bobot visual berdasarkan
 // kedekatan ruas dengan hubungan OD besar.
@@ -265,9 +253,7 @@ function estimatedPressure(a, b) {
   );
 }
 
-// ========================================
 // MEMBUAT URL OSRM
-// ========================================
 
 function routeUrl(base, zoneIds) {
   const locations = zoneIds.map(
@@ -289,9 +275,7 @@ function routeUrl(base, zoneIds) {
   );
 }
 
-// ========================================
 // MENGAMBIL SATU RUTE
-// ========================================
 
 async function fetchOneRoute(zoneIds) {
   let lastError;
@@ -364,9 +348,7 @@ async function fetchOneRoute(zoneIds) {
   );
 }
 
-// ========================================
 // MEMBENTUK ROAD NETWORK
-// ========================================
 
 function networkFromRoutes(routes) {
   const nodes = [];
@@ -525,9 +507,7 @@ function networkFromRoutes(routes) {
   };
 }
 
-// ========================================
 // BROWSER CACHE
-// ========================================
 
 async function readCache() {
   if (
@@ -569,9 +549,7 @@ async function readCache() {
   }
 }
 
-// ========================================
 // SAVE CACHE
-// ========================================
 
 async function writeCache(graph) {
   if (
@@ -606,9 +584,7 @@ async function writeCache(graph) {
   }
 }
 
-// ========================================
 // LOAD REAL STREET NETWORK
-// ========================================
 
 async function createRealNetwork() {
   const cached = await readCache();
@@ -678,9 +654,7 @@ async function createRealNetwork() {
   return graph;
 }
 
-// ========================================
 // MAIN EXPORT
-// ========================================
 
 let currentLoad = null;
 

@@ -3,20 +3,16 @@ import {
   ArrowRight,
   ArrowUpRight,
   BusFront,
-  Route,
+  MapPin,
+  Footprints,
+  SlidersHorizontal,
   Flower2,
   Sun,
   Leaf,
-  MapPin,
   Database,
   GitCompareArrows,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
-
-/* ==========================================
-   BALINESE DECORATIVE COMPONENTS
-========================================== */
 
 function BaliMandala() {
   return (
@@ -192,10 +188,6 @@ function BaliFlower() {
   );
 }
 
-/* ==========================================
-   FOOTER NAVIGATION DATA
-========================================== */
-
 const exploreLinks = [
   { label: "Home", page: "home" },
   { label: "The Problems", page: "problems" },
@@ -210,16 +202,8 @@ const modelingLinks = [
   { label: "Transit Integration", page: "transit" },
 ];
 
-/* ==========================================
-   MAIN FOOTER
-========================================== */
-
-export default function Footer({ go }) {
+export default function Footer({ onNavigate }) {
   const cardRef = useRef(null);
-
-  /* ========================================
-     MULTI-LAYER PARALLAX
-  ======================================== */
 
   useEffect(() => {
     const card = cardRef.current;
@@ -316,21 +300,18 @@ export default function Footer({ go }) {
   }, []);
 
   const navigate = (page) => {
-    if (typeof go === "function") {
-      go(page);
+    if (typeof onNavigate === "function") {
+      onNavigate(page);
     }
   };
 
   return (
     <footer className="mt-20 w-full">
-      {/* =====================================
-          PREMIUM BALI CTA
-      ===================================== */}
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <section
           ref={cardRef}
-          className="dmf-cta relative isolate overflow-hidden rounded-[28px] px-7 pb-24 pt-12 text-white sm:rounded-[36px] sm:px-12 sm:pb-28 sm:pt-16 lg:px-16"
+          className="dmf-cta relative isolate overflow-hidden rounded-[28px] px-7 pb-16 pt-12 text-white sm:rounded-[36px] sm:px-12 sm:pb-20 sm:pt-16 lg:px-16"
           aria-labelledby="dmf-cta-title"
         >
           {/* BACKGROUND PATTERN */}
@@ -399,17 +380,17 @@ export default function Footer({ go }) {
               {/* FEATURE CHIPS */}
               <div className="mt-7 flex flex-wrap gap-2">
                 <span className="dmf-feature-chip">
-                  <Route size={14} />
+                  <MapPin size={14} />
                   13 Urban Zones
                 </span>
 
                 <span className="dmf-feature-chip">
-                  <Leaf size={14} />
+                  <Footprints size={14} />
                   Sustainable Mobility
                 </span>
 
                 <span className="dmf-feature-chip">
-                  <Sparkles size={14} />
+                  <SlidersHorizontal size={14} />
                   TDM Strategy
                 </span>
               </div>
@@ -448,9 +429,9 @@ export default function Footer({ go }) {
             </div>
           </div>
 
-          {/* ANIMATED TRANSPORT ROUTE */}
+          {/* STATIC TRANSIT ROUTE */}
           <div
-            className="pointer-events-none absolute bottom-7 left-7 right-7 z-10 h-8 sm:left-12 sm:right-12 lg:left-16 lg:right-16"
+            className="pointer-events-none absolute bottom-7 left-7 right-7 z-10 h-3 sm:left-12 sm:right-12 lg:left-16 lg:right-16"
             aria-hidden="true"
           >
             <div className="dmf-route-line absolute left-0 right-0 top-1/2" />
@@ -462,17 +443,9 @@ export default function Footer({ go }) {
                 style={{ left: `${position}%` }}
               />
             ))}
-
-            <div className="dmf-moving-bus absolute top-1/2 text-[#FFE1A0]">
-              <BusFront size={25} strokeWidth={2.2} />
-            </div>
           </div>
         </section>
       </div>
-
-      {/* =====================================
-          MAIN FOOTER
-      ===================================== */}
 
       <div className="dmf-footer-main mt-14">
         <div className="mx-auto max-w-7xl px-4 pb-12 pt-14 sm:px-6 lg:px-8">

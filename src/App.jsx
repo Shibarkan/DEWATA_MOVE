@@ -1,9 +1,7 @@
 
 import { useEffect, useState } from "react";
 
-// ==========================================
 // DEWATAMOVE 2041 — MAIN APPLICATION
-// ==========================================
 
 // GLOBAL LAYOUT
 import Header from "./components/layout/Header";
@@ -21,9 +19,7 @@ import ModelOverview from "./pages/ModelOverview";
 // TRANS METRO DEWATA
 import Transit from "./pages/Transit";
 
-// ==========================================
 // PAGE CONFIGURATION
-// ==========================================
 
 const MODELING_PAGES = [
   "before",
@@ -47,9 +43,7 @@ const ALLOWED_PAGES = [
   ...TRANSIT_PAGES,
 ];
 
-// ==========================================
 // READ PAGE FROM URL
-// ==========================================
 
 function readPageFromURL() {
   if (typeof window === "undefined") {
@@ -72,9 +66,7 @@ function readPageFromURL() {
   return "home";
 }
 
-// ==========================================
 // APPLICATION COMPONENT
-// ==========================================
 
 export default function App() {
   // CURRENT PAGE
@@ -82,9 +74,7 @@ export default function App() {
     readPageFromURL
   );
 
-  // ========================================
   // TRANSIT CONFIGURATION
-  // ========================================
 
   const [transitConfig, setTransitConfig] =
     useState({
@@ -94,9 +84,7 @@ export default function App() {
       cycleTime: 90,
     });
 
-  // ========================================
   // SYNC URL WITH PAGE
-  // ========================================
 
   useEffect(() => {
     const syncPage = () => {
@@ -116,9 +104,7 @@ export default function App() {
     };
   }, []);
 
-  // ========================================
   // NAVIGATION FUNCTION
-  // ========================================
 
   const navigate = (target) => {
     const nextPage =
@@ -147,9 +133,7 @@ export default function App() {
     });
   };
 
-  // ========================================
   // PAGE DETECTION
-  // ========================================
 
   const isModeling =
     MODELING_PAGES.includes(page);
@@ -157,9 +141,7 @@ export default function App() {
   const isTransit =
     TRANSIT_PAGES.includes(page);
 
-  // ========================================
   // RENDER APPLICATION
-  // ========================================
 
   return (
     <div
@@ -173,21 +155,10 @@ export default function App() {
       "
     >
 
-      {/* ==================================
-          HEADER
-          - Original animation remains
-          - AnimatedBus remains
-          - Tailwind Modeling dropdown
-      ================================== */}
-
       <Header
         activePage={page}
         onNavigate={navigate}
       />
-
-      {/* ==================================
-          MAIN CONTENT
-      ================================== */}
 
       <main className="min-w-0 flex-1">
 
@@ -219,19 +190,6 @@ export default function App() {
           <Methodology />
         )}
 
-        {/* ==================================
-            MODELING STUDIO
-
-            BEFORE TDM
-            PROCESS TDM
-            AFTER TDM
-            COMPARISON
-
-            All stages share ModelOverview.
-            This keeps the modeling system
-            consistent during navigation.
-        ================================== */}
-
         {isModeling && (
           <ModelOverview
             type={page}
@@ -239,14 +197,6 @@ export default function App() {
             transitConfig={transitConfig}
           />
         )}
-
-        {/* ==================================
-            TRANS METRO DEWATA
-
-            OPERATOR
-            DRIVER / FEEDER
-            PASSENGER
-        ================================== */}
 
         {isTransit && (
           <Transit
@@ -258,10 +208,6 @@ export default function App() {
         )}
 
       </main>
-
-      {/* ==================================
-          FOOTER
-      ================================== */}
 
       <Footer
         onNavigate={navigate}
