@@ -14,6 +14,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 function BaliMandala() {
   return (
     <svg
@@ -558,7 +560,7 @@ export default function Footer({ onNavigate }) {
           {/* FOOTER BOTTOM */}
           <div className="flex flex-col items-center justify-between gap-5 pt-7 text-center sm:flex-row sm:text-left">
             <p className="text-xs leading-6 text-slate-500">
-              © {new Date().getFullYear()} DewataMove 2041. All rights reserved.
+              © {CURRENT_YEAR} DewataMove 2041. All rights reserved.
             </p>
 
             <div className="flex items-center gap-2 text-xs text-slate-500">

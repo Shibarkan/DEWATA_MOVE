@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 import { TMD_BOUNDS } from "../../data/tmdNetwork";
@@ -49,28 +49,24 @@ export default function SimulationPreview({
   const [showHotspots, setShowHotspots] = useState(true);
   const [showOD, setShowOD] = useState(false);
 
-  // Mode TMD
-  const [networkOnly, setNetworkOnly] = useState(false);
-
   // Kontrol
   const [mapMode, setMapMode] = useState("all");
+  const networkOnly = mapMode === "tmd";
   const [origin, setOrigin] = useState("Z03");
   const [destination, setDestination] = useState("Z11");
   const [visibleCount, setVisibleCount] = useState(0);
 
-  settingsRef.current = {
-    scenario,
-    density,
-    playing,
-    showHeat,
-    showHotspots,
-    networkOnly,
-    mapMode,
-  };
-
-  useEffect(() => {
-    setScenario(initialScenario);
-  }, [initialScenario]);
+  useLayoutEffect(() => {
+    settingsRef.current = {
+      scenario,
+      density,
+      playing,
+      showHeat,
+      showHotspots,
+      networkOnly,
+      mapMode,
+    };
+  }, [scenario, density, playing, showHeat, showHotspots, networkOnly, mapMode]);
 
   useSimulationMap({
     mapElement,
@@ -106,7 +102,7 @@ export default function SimulationPreview({
     const hotspotLayer = hotspotLayerRef.current;
 
     if (zoneLayer) {
-      if (mapMode === "tmd") {
+      if (mapMode !== "all") {
         if (map.hasLayer(zoneLayer)) {
           map.removeLayer(zoneLayer);
         }
@@ -116,7 +112,7 @@ export default function SimulationPreview({
     }
 
     if (hotspotLayer) {
-      const visible = showHotspots && mapMode !== "tmd";
+      const visible = mapMode === "mat" || (mapMode === "all" && showHotspots);
 
       if (visible && !map.hasLayer(hotspotLayer)) {
         hotspotLayer.addTo(map);
@@ -125,6 +121,14 @@ export default function SimulationPreview({
       if (!visible && map.hasLayer(hotspotLayer)) {
         map.removeLayer(hotspotLayer);
       }
+
+      hotspotLayer.eachLayer((layer) => {
+        if (mapMode === "mat") {
+          layer.openTooltip();
+        } else {
+          layer.closeTooltip();
+        }
+      });
     }
   }, [network, mapMode, showHotspots]);
 
@@ -140,7 +144,7 @@ export default function SimulationPreview({
       odLayerRef.current = null;
     }
 
-    if (!showOD || mapMode === "tmd") return;
+    if (!showOD || mapMode !== "all") return;
 
     const targetIndex = network.zones.findIndex(
       (zone) => zone.id === destination,
@@ -171,13 +175,12 @@ export default function SimulationPreview({
 
   function selectMapMode(nextMode) {
     const map = mapRef.current;
-    const showTmd = nextMode !== "roads";
+    const showTmd = nextMode === "tmd" || nextMode === "all";
     const tmdLayer = tmdLayerRef.current?.layer;
 
     setMapMode(nextMode);
-    setNetworkOnly(nextMode === "tmd");
 
-    if (nextMode === "tmd") {
+    if (nextMode !== "all") {
       setShowOD(false);
     }
 
@@ -192,6 +195,8 @@ export default function SimulationPreview({
     if (nextMode === "all") {
       setShowHeat(true);
       setShowHotspots(true);
+    } else {
+      setShowHeat(false);
     }
 
     if (!map) return;
@@ -234,7 +239,6 @@ export default function SimulationPreview({
   }
 
   function reset() {
-    setNetworkOnly(false);
     setDensity(DEFAULT_DENSITY);
     setScenario(initialScenario);
     setPlaying(true);
@@ -316,6 +320,7 @@ export default function SimulationPreview({
       />
 
       <SimulationDataPanel
+        mapMode={mapMode}
         networkOnly={networkOnly}
         showScenarioControls={showScenarioControls}
         scenario={scenario}

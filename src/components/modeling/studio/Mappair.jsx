@@ -95,11 +95,11 @@ export default function MapPair({
         Geser atau zoom salah satu peta: kamera peta
         lainnya mengikuti posisi yang sama. Setiap peta
         memiliki pilihan Jaringan Jalan, Jaringan TMD,
-        dan Denpasar Bali secara terpisah.
+        Tarikan MAT, dan tampilan gabungan Denpasar Bali.
         Arus ruas, garis OD, dan ukuran lingkaran zona
         mengikuti MAT pada skenario masing-masing.
-        Lingkaran menonjolkan zona dengan tarikan MAT
-        terbesar, bukan batas wilayah.
+        Mode Tarikan MAT menampilkan besaran tarikan tiap
+        zona; ukuran lingkaran bukan batas wilayah.
         Kendaraan serta warna ruas adalah ilustrasi
         relatif, bukan V/C terukur.
       </p>

@@ -1,6 +1,7 @@
 import {
   BusFront,
   CarFront,
+  CircleDollarSign,
   Info,
   Map as MapIcon,
   Minus,
@@ -65,6 +66,20 @@ export default function SimulationMapControls({
 
         <button
           type="button"
+          onClick={() => onSelectMapMode("mat")}
+          aria-pressed={mapMode === "mat"}
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
+            mapMode === "mat"
+              ? "bg-[#B91C1C] text-white"
+              : "text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          <CircleDollarSign size={14} />
+          Tarikan MAT
+        </button>
+
+        <button
+          type="button"
           onClick={() => onSelectMapMode("all")}
           aria-pressed={mapMode === "all"}
           className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
@@ -80,9 +95,9 @@ export default function SimulationMapControls({
         <button
           type="button"
           onClick={() => setShowOD((visible) => !visible)}
-          disabled={networkOnly}
+          disabled={mapMode !== "all"}
           aria-pressed={showOD}
-          title={networkOnly ? "OD tidak ditampilkan pada mode Jaringan TMD" : undefined}
+          title={mapMode !== "all" ? "OD hanya tersedia pada mode Denpasar Bali" : undefined}
           className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 sm:text-xs disabled:cursor-not-allowed disabled:opacity-50 ${
             showOD
               ? "bg-[#B91C1C] text-white"
@@ -158,6 +173,10 @@ export default function SimulationMapControls({
         <div className="pointer-events-none absolute bottom-3 left-3 z-[900] flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
           <BusFront size={15} className="text-[#B91C1C]" />
           6 Koridor Trans Metro Dewata
+        </div>
+      ) : mapMode === "mat" ? (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-[900] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] font-semibold text-slate-700 shadow-sm">
+          Ukuran lingkaran dan label menunjukkan tarikan MAT (smp/jam)
         </div>
       ) : (
         <>

@@ -142,13 +142,19 @@ export function useSimulationMap({
       if (
         !graph ||
         !settingsRef.current.showHeat ||
-        settingsRef.current.mapMode === "tmd"
+        settingsRef.current.mapMode !== "all"
       ) {
         sceneRef.current.heatCanvas = null;
         return;
       }
 
       const size = map.getSize();
+
+      if (size.x <= 0 || size.y <= 0) {
+        sceneRef.current.heatCanvas = null;
+        return;
+      }
+
       const dpr = Math.min(
         window.devicePixelRatio || 1,
         1.8
@@ -385,7 +391,10 @@ export function useSimulationMap({
       ctx.clearRect(0, 0, size.x, size.y);
 
       // Only the Denpasar overview shows MAT and traffic overlays.
-      if (settingsRef.current.mapMode === "tmd") {
+      if (
+        settingsRef.current.mapMode === "tmd" ||
+        settingsRef.current.mapMode === "mat"
+      ) {
         return 0;
       }
 
@@ -393,7 +402,8 @@ export function useSimulationMap({
 
       if (
         settingsRef.current.showHeat &&
-        sceneRef.current.heatCanvas
+        sceneRef.current.heatCanvas?.width > 0 &&
+        sceneRef.current.heatCanvas?.height > 0
       ) {
         ctx.drawImage(
           sceneRef.current.heatCanvas,
@@ -649,8 +659,9 @@ export function useSimulationMap({
           hotspotLayerRef.current = group;
 
           if (
-            settingsRef.current.showHotspots &&
-            settingsRef.current.mapMode !== "tmd"
+            (settingsRef.current.showHotspots &&
+              settingsRef.current.mapMode === "all") ||
+            settingsRef.current.mapMode === "mat"
           ) {
             group.addTo(map);
           }
@@ -674,7 +685,7 @@ export function useSimulationMap({
 
         zoneLayerRef.current = zoneLayer;
 
-        if (settingsRef.current.mapMode !== "tmd") {
+        if (settingsRef.current.mapMode === "all") {
           zoneLayer.addTo(map);
         }
 

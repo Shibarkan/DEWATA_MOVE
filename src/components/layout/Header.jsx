@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, X, ChevronDown, BusFront, Flower2, Sun } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 
 import AnimatedBus from "./AnimatedBus";
 
@@ -62,8 +62,6 @@ export default function Header({ activePage = "home", onNavigate }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileGroup, setMobileGroup] = useState(null);
   const [desktopGroup, setDesktopGroup] = useState(null);
-  const [logoError, setLogoError] = useState(false);
-
   const headerRef = useRef(null);
 
   /* SCROLL DETECTION */

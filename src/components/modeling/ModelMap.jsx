@@ -6,6 +6,7 @@ import { addTmdNetworkLayer } from "../../data/tmdNetwork";
 import { createODFlowLayer } from "../../data/odVisualization";
 import {
   CarFront,
+  CircleDollarSign,
   LocateFixed,
   Map as MapIcon,
   Minus,
@@ -75,10 +76,10 @@ export default function ModelMap({
   const [showOD, setShowOD] = useState(false);
 
   const isBefore = stage === "before";
-  const showTmdLayer = displayMode !== "roads";
+  const showTmdLayer = displayMode === "tmd" || displayMode === "all";
 
   function changeDisplayMode(nextMode) {
-    if (nextMode === "tmd") {
+    if (nextMode !== "all") {
       setShowOD(false);
     }
 
@@ -293,7 +294,7 @@ export default function ModelMap({
 
     group.clearLayers();
 
-    if (displayMode === "tmd") {
+    if (displayMode !== "all") {
       if (map.hasLayer(group)) {
         map.removeLayer(group);
       }
@@ -330,7 +331,7 @@ export default function ModelMap({
 
     if (
       !map ||
-      displayMode === "tmd" ||
+      (displayMode !== "all" && displayMode !== "mat") ||
       !Array.isArray(matrix) ||
       !Array.isArray(model?.matrixBefore)
     ) {
@@ -384,6 +385,9 @@ export default function ModelMap({
             ? RED
             : "#F59E0B";
 
+      const attractionLabel =
+        `Tarikan: ${Math.round(incoming).toLocaleString("id-ID")} smp/jam`;
+
       L.circleMarker([zone.lat, zone.lng], {
         pane: "dmMatActivityPane",
         radius: 18 + 24 * Math.sqrt(intensity),
@@ -394,10 +398,19 @@ export default function ModelMap({
         fillOpacity: 0.1,
       })
         .bindTooltip(
-          `<strong>${zone.id} · ${zone.name}</strong>` +
-            `<br/>Bangkitan: ${Math.round(outgoing).toLocaleString("id-ID")} smp/jam` +
-            `<br/>Tarikan: ${Math.round(incoming).toLocaleString("id-ID")} smp/jam` +
-            `<br/>Ukuran lingkaran mengikuti tarikan MAT relatif.`,
+          displayMode === "mat"
+            ? attractionLabel
+            : `<strong>${zone.id} · ${zone.name}</strong>` +
+                `<br/>Bangkitan: ${Math.round(outgoing).toLocaleString("id-ID")} smp/jam` +
+                `<br/>Tarikan: ${Math.round(incoming).toLocaleString("id-ID")} smp/jam` +
+                `<br/>Ukuran lingkaran mengikuti tarikan MAT relatif.`,
+          displayMode === "mat"
+            ? {
+                permanent: true,
+                direction: "top",
+                offset: [0, -20],
+              }
+            : undefined,
         )
         .on("click", () => selectRef.current?.(zone.id))
         .addTo(layer);
@@ -436,7 +449,7 @@ export default function ModelMap({
 
     vehiclesRef.current = createVehicles(roads, vehiclesRef.current);
 
-    if (displayMode !== "tmd") {
+    if (displayMode === "roads" || displayMode === "all") {
       // Kelompokkan jalan berdasarkan
       // warna supaya tidak membuat
       // ribuan layer individual.
@@ -475,7 +488,7 @@ export default function ModelMap({
       });
     }
 
-    if (showOD && displayMode !== "tmd") {
+    if (showOD && displayMode === "all") {
       const flows = (model?.pairs || [])
         .map((pair) => ({
           origin: pair.origin,
@@ -568,7 +581,7 @@ export default function ModelMap({
 
       const settings = settingsRef.current;
 
-      if (settings.displayMode === "tmd") {
+      if (settings.displayMode === "tmd" || settings.displayMode === "mat") {
         return;
       }
 
@@ -754,6 +767,24 @@ export default function ModelMap({
 
         <button
           type="button"
+          onClick={() => changeDisplayMode("mat")}
+          aria-pressed={displayMode === "mat"}
+          className={`
+            flex items-center gap-1.5 rounded-lg px-2.5 py-2
+            text-[11px] font-semibold transition-colors
+            ${
+              displayMode === "mat"
+                ? "bg-[#B91C1C] text-white"
+                : "text-slate-600 hover:bg-slate-100"
+            }
+          `}
+        >
+          <CircleDollarSign size={14} />
+          Tarikan MAT
+        </button>
+
+        <button
+          type="button"
           onClick={() => changeDisplayMode("tmd")}
           aria-pressed={displayMode === "tmd"}
           className={`
@@ -793,11 +824,11 @@ export default function ModelMap({
         <button
           type="button"
           onClick={() => setShowOD((visible) => !visible)}
-          disabled={displayMode === "tmd"}
+          disabled={displayMode !== "all"}
           aria-pressed={showOD}
           title={
-            displayMode === "tmd"
-              ? "OD tersedia pada mode Jaringan Jalan dan Denpasar Bali"
+            displayMode !== "all"
+              ? "OD hanya tersedia pada mode Denpasar Bali"
               : undefined
           }
           className={`
@@ -816,7 +847,7 @@ export default function ModelMap({
         </button>
       </div>
 
-      {displayMode !== "tmd" && (
+      {(displayMode === "roads" || displayMode === "all") && (
         <div className="absolute left-3 top-32 z-[900] flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-white/95 px-2.5 py-2 text-[10px] font-medium text-slate-600 shadow-sm">
           {[
             ["#0F766E", "Rendah"],
@@ -832,6 +863,12 @@ export default function ModelMap({
               {label}
             </span>
           ))}
+        </div>
+      )}
+
+      {displayMode === "mat" && (
+        <div className="absolute bottom-3 left-3 z-[900] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-[10px] font-semibold text-slate-700 shadow-sm">
+          Besar lingkaran dan label = tarikan MAT
         </div>
       )}
 

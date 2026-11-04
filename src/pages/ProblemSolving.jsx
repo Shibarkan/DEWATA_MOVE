@@ -183,7 +183,7 @@ export default function ProblemSolving({ onNavigate }) {
         <div className="mx-auto max-w-7xl">
           <Reveal>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-              {stages.map((stage, index) => (
+              {stages.map((stage) => (
                 <div
                   key={stage}
                   className="rounded-2xl border border-slate-200 bg-[#FAFAFA] p-4"

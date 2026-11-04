@@ -1,7 +1,13 @@
+import { lazy, Suspense } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 
 import Reveal from "../components/ui/Reveal";
-import SimulationPreview from "../components/home/SimulationPreview";
+import DeferredRender from "../components/ui/DeferredRender";
+import SimulationPreviewSkeleton from "../components/home/SimulationPreviewSkeleton";
+
+const SimulationPreview = lazy(
+  () => import("../components/home/SimulationPreview"),
+);
 
 import {
   matTotal,
@@ -229,7 +235,14 @@ export default function Home({ onNavigate }) {
           </Reveal>
 
           <Reveal delay={100}>
-            <SimulationPreview />
+            <DeferredRender
+              rootMargin="480px 0px"
+              placeholder={<SimulationPreviewSkeleton />}
+            >
+              <Suspense fallback={<SimulationPreviewSkeleton />}>
+                <SimulationPreview />
+              </Suspense>
+            </DeferredRender>
           </Reveal>
         </div>
       </section>

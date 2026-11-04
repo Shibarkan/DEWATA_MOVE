@@ -311,7 +311,7 @@ export default function ProcessStage({
                   <section className="min-w-0">
                     <SectionHeading
                       title="Sebelum dan pratinjau sesudah"
-                      description="Dua peta dengan hasil MAT Before dan pratinjau After yang berbeda. Pilih Jaringan Jalan, Jaringan TMD, atau Denpasar Bali pada tiap peta."
+                      description="Dua peta dengan hasil MAT Before dan pratinjau After yang berbeda. Pilih Jaringan Jalan, Jaringan TMD, Tarikan MAT, atau tampilan gabungan Denpasar Bali pada tiap peta."
                     />
 
                     <MapPair

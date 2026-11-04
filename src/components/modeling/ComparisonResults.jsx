@@ -14,8 +14,6 @@ import { useMemo, useState } from "react";
   - Tanpa library chart tambahan
 */
 
-const RED = "#B91C1C";
-
 const number = (value) =>
   Math.round(Number(value) || 0).toLocaleString("id-ID");
 
