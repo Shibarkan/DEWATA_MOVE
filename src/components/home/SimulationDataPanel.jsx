@@ -109,6 +109,20 @@ export default function SimulationDataPanel({
     );
   }
 
+  if (mapMode === "roads") {
+    return (
+      <div className="px-3 py-5 sm:px-5">
+        <h3 className="text-base font-bold text-slate-900">
+          Jaringan Jalan Denpasar
+        </h3>
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+          Mode ini menampilkan jaringan jalan dan simulasi kendaraan. Layer
+          TMD dan tarikan MAT disembunyikan.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="grid gap-5 p-3 sm:p-5 lg:grid-cols-3">

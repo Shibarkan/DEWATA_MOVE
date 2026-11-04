@@ -925,28 +925,30 @@ export default function ModelMap({
 
       {/* PLAY / PAUSE */}
 
-      <div
-        className="
-          absolute bottom-3 left-3 z-[900]
-          flex items-center gap-2
-        "
-      >
-        <button
-          type="button"
-          onClick={() => setPlaying((value) => !value)}
+      {(displayMode === "roads" || displayMode === "all") && (
+        <div
           className="
+            absolute bottom-3 left-3 z-[900]
             flex items-center gap-2
-            rounded-lg border border-slate-200
-            bg-white/95 px-3 py-2
-            text-[11px] font-semibold
-            text-slate-700 shadow-sm
           "
         >
-          {playing ? <Pause size={13} /> : <Play size={13} />}
+          <button
+            type="button"
+            onClick={() => setPlaying((value) => !value)}
+            className="
+              flex items-center gap-2
+              rounded-lg border border-slate-200
+              bg-white/95 px-3 py-2
+              text-[11px] font-semibold
+              text-slate-700 shadow-sm
+            "
+          >
+            {playing ? <Pause size={13} /> : <Play size={13} />}
 
-          {playing ? "Jeda" : "Putar"}
-        </button>
-      </div>
+            {playing ? "Jeda" : "Putar"}
+          </button>
+        </div>
+      )}
 
       {/* STAGE LABEL */}
 

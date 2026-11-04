@@ -110,14 +110,16 @@ export default function SimulationMapControls({
 
         <div className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" />
 
-        <button
-          type="button"
-          onClick={() => setPlaying((value) => !value)}
-          className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 hover:bg-slate-100"
-          aria-label={playing ? "Jeda kendaraan" : "Jalankan kendaraan"}
-        >
-          {playing ? <Pause size={15} /> : <Play size={15} />}
-        </button>
+        {(mapMode === "roads" || mapMode === "all") && (
+          <button
+            type="button"
+            onClick={() => setPlaying((value) => !value)}
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-700 hover:bg-slate-100"
+            aria-label={playing ? "Jeda kendaraan" : "Jalankan kendaraan"}
+          >
+            {playing ? <Pause size={15} /> : <Play size={15} />}
+          </button>
+        )}
 
         <button
           type="button"
@@ -184,28 +186,30 @@ export default function SimulationMapControls({
             {formatNumber(visibleCount)} kendaraan terlihat
           </div>
 
-          <div className="pointer-events-none absolute bottom-3 right-3 z-[900] max-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm">
-            <p className="mb-1.5 font-bold text-slate-700">
-              Kepadatan jalan dari MAT
-            </p>
-            {[
-              ["#0F766E", "Rendah"],
-              ["#D3AD4C", "Sedang"],
-              ["#EA751F", "Tinggi"],
-              ["#B91C1C", "Sangat padat"],
-            ].map(([color, label]) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span
-                  className="h-0.5 w-4 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-                {label}
-              </div>
-            ))}
-            <p className="mt-1.5 border-t border-slate-100 pt-1.5 leading-4">
-              Laju kendaraan adalah estimasi visual IDM.
-            </p>
-          </div>
+          {mapMode === "all" && (
+            <div className="pointer-events-none absolute bottom-3 right-3 z-[900] max-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm">
+              <p className="mb-1.5 font-bold text-slate-700">
+                Kepadatan jalan dari MAT
+              </p>
+              {[
+                ["#0F766E", "Rendah"],
+                ["#D3AD4C", "Sedang"],
+                ["#EA751F", "Tinggi"],
+                ["#B91C1C", "Sangat padat"],
+              ].map(([color, label]) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <span
+                    className="h-0.5 w-4 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  {label}
+                </div>
+              ))}
+              <p className="mt-1.5 border-t border-slate-100 pt-1.5 leading-4">
+                Laju kendaraan adalah estimasi visual IDM.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
