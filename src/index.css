@@ -2111,7 +2111,7 @@ a {
 }
 
 /* Bus icon inherits dark-red theme
-   when using currentColor */
+  when using currentColor */
 
 .dmh-header .tmd-orbit-bus svg {
   color: #a52630;

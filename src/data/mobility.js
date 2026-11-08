@@ -1,3 +1,4 @@
+import { validateMatrixIntegrity } from "./dataValidation.js";
 
 export const zoneNames = [
   "Dangin Puri dan Sumerta",
@@ -71,26 +72,34 @@ export const dataNotes = {
 };
 
 export function validateMAT(matrix = mat2026) {
-  const validShape =
-    matrix.length === 13 &&
-    matrix.every(
-      (row) => Array.isArray(row) && row.length === 13
-    );
-
-  const validValues =
-    validShape &&
-    matrix.every((row) =>
-      row.every((value) =>
-        Number.isFinite(value) && value >= 0
-      )
-    );
+  const validation = validateMatrixIntegrity(matrix, {
+    year: 2026,
+    period: "peak",
+    unit: "smp/jam",
+    coverage: "Kota Denpasar dan hubungan mobilitas terkait",
+    source: "ITEC-U case study data",
+    datasetType: "MAT",
+    qualityStatus: "Verified",
+  });
 
   return {
-    valid: validShape && validValues,
-    rows: matrix.length,
-    columns: validShape ? matrix[0].length : null,
-    total: validValues
-      ? matrix.flat().reduce((a, b) => a + b, 0)
-      : null,
+    valid: validation.valid,
+    rows: validation.shape.rows,
+    columns: validation.shape.columns,
+    total: validation.total,
+    diagonalTotal: validation.diagonalTotal,
+    offDiagonalTotal: validation.offDiagonalTotal,
+    issues: validation.issues,
+    qualityStatus: validation.qualityStatus,
   };
 }
+
+export const matrixQualityReport = validateMatrixIntegrity(mat2026, {
+  year: 2026,
+  period: "peak",
+  unit: "smp/jam",
+  coverage: "Kota Denpasar dan hubungan mobilitas terkait",
+  source: "ITEC-U case study data",
+  datasetType: "MAT",
+  qualityStatus: "Verified",
+});

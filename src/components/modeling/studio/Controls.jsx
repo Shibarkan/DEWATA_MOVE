@@ -43,7 +43,7 @@ export function Slider({
             <span className="font-bold text-slate-800">
               Dasar preset {reference.preset}: {" "}
             </span>
-            {reference.reason}
+            {reference.why}
           </p>
 
           {reference.sources?.length > 0 ? (
@@ -54,7 +54,7 @@ export function Slider({
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`${source.role}. Buka rujukan resmi di tab baru.`}
+                  title="Buka rujukan di tab baru."
                   className="font-semibold text-[#B91C1C] underline decoration-[#B91C1C]/30 underline-offset-2 hover:text-[#991B1B]"
                 >
                   Lihat sumber: {source.label} ↗
@@ -72,7 +72,6 @@ export function Slider({
               Status angka dan keterbatasan penelitian
             </summary>
             <p className="mt-2">{reference.status}</p>
-            <p className="mt-1">{reference.evidence}</p>
             <p className="mt-1 font-medium text-slate-700">
               Saat slider diubah, angka baru adalah nilai uji pengguna dan belum otomatis menjadi angka terkalibrasi.
             </p>

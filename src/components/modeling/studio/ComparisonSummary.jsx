@@ -50,7 +50,7 @@ export default function ComparisonSummary({ model }) {
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-slate-200 py-6">
         <div>
           <p className="text-xs text-slate-500">
-            Perubahan permintaan
+            Perubahan MAT · sensitivitas eksplisit
           </p>
 
           <p

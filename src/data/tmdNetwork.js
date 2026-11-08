@@ -420,50 +420,31 @@ function busIcon(color, routeId) {
         display:flex;
         align-items:center;
         justify-content:center;
-        gap:3px;
-        width:36px;
-        height:24px;
-        border:1.5px solid ${color};
-        border-radius:8px;
+        position:relative;
+        width:25px;
+        height:25px;
+        border:1px solid #CBD5E1;
+        border-radius:50%;
         background:#FFFFFF;
-        box-shadow:0 2px 7px #0f172a35;
-        white-space:nowrap;
+        box-shadow:0 1px 4px #0f172a30;
+        color:#334155;
+        font:700 10px/1 system-ui,sans-serif;
       ">
-        <span style="
-          position:relative;
-          display:block;
-          width:18px;
-          height:13px;
-          border-radius:4px 4px 3px 3px;
-          background:#243244;
-          box-shadow:inset 0 -3px 0 ${color};
-        ">
-          <span style="
-            position:absolute;
-            left:3px;
-            right:3px;
-            top:2px;
-            height:4px;
-            border-radius:2px;
-            background:linear-gradient(90deg,#9FC6DA 0 43%,#243244 43% 55%,#9FC6DA 55%);
-          "></span>
-          <span style="
-            position:absolute;
-            left:3px;
-            bottom:-2px;
-            width:4px;
-            height:4px;
-            border:1px solid #FFFFFF;
-            border-radius:50%;
-            background:#17202E;
-            box-shadow:9px 0 0 -1px #17202E,9px 0 0 0 #FFFFFF;
-          "></span>
-        </span>
-        <b style="font-size:9px;line-height:1;color:${color}">${routeId}</b>
+        ${routeId}
+        <i style="
+          position:absolute;
+          right:1px;
+          bottom:1px;
+          width:6px;
+          height:6px;
+          border:1px solid #FFFFFF;
+          border-radius:50%;
+          background:${color};
+        "></i>
       </span>
     `,
-    iconSize: [36, 24],
-    iconAnchor: [18, 12],
+    iconSize: [25, 25],
+    iconAnchor: [12, 12],
   });
 }
 
@@ -502,8 +483,8 @@ export function addTmdNetworkLayer(
       const halo = L.polyline(points, {
         pane: "dmTmdRoutePane",
         color: "#FFFFFF",
-        weight: 7,
-        opacity: 0.96,
+        weight: 5,
+        opacity: 0.62,
         lineCap: "round",
         lineJoin: "round",
         interactive: false,
@@ -512,9 +493,9 @@ export function addTmdNetworkLayer(
       const line = L.polyline(points, {
         pane: "dmTmdRoutePane",
         color: corridor.color,
-        weight: 3.8,
-        opacity: 0.96,
-        dashArray: "6 6",
+        weight: 2.6,
+        opacity: 0.62,
+        dashArray: "4 8",
         lineCap: "round",
         lineJoin: "round",
         interactive: false,

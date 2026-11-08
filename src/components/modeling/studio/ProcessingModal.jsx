@@ -8,9 +8,9 @@ const ANALYSIS_STEPS = [
       "Menyiapkan MAT 2026 dan parameter proyeksi.",
   },
   {
-    title: "Menghitung dampak kebijakan",
+    title: "Menghitung hasil skenario",
     detail:
-      "Menghitung matriks Before dan After pada horizon 2041.",
+      "Menerapkan proyeksi dan sensitivitas eksplisit pada matriks 2041.",
   },
   {
     title: "Mensimulasikan arus perjalanan",

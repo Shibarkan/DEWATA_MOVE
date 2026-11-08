@@ -189,13 +189,13 @@ export default function SimulationMapControls({
           {mapMode === "all" && (
             <div className="pointer-events-none absolute bottom-3 right-3 z-[900] max-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[10px] text-slate-600 shadow-sm">
               <p className="mb-1.5 font-bold text-slate-700">
-                Kepadatan jalan dari MAT
+                Tekanan arus relatif
               </p>
               {[
                 ["#0F766E", "Rendah"],
                 ["#D3AD4C", "Sedang"],
                 ["#EA751F", "Tinggi"],
-                ["#B91C1C", "Sangat padat"],
+                ["#B91C1C", "Sangat tinggi"],
               ].map(([color, label]) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <span
@@ -206,7 +206,7 @@ export default function SimulationMapControls({
                 </div>
               ))}
               <p className="mt-1.5 border-t border-slate-100 pt-1.5 leading-4">
-                Laju kendaraan adalah estimasi visual IDM.
+                Arus merupakan proksi visual dari kedekatan OD, bukan volume terukur. Laju kendaraan adalah estimasi visual IDM.
               </p>
             </div>
           )}

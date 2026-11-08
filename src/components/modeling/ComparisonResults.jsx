@@ -112,7 +112,7 @@ function Summary({ model }) {
       <div className="mt-9 flex flex-wrap items-end justify-between gap-5 border-t border-slate-100 pt-7">
         <div>
           <p className="text-[12px] font-medium text-slate-600">
-            Perubahan permintaan ekuivalen kendaraan
+            Perubahan MAT · sensitivitas eksplisit
           </p>
 
           <p className="mt-2 text-[clamp(2.2rem,6vw,4rem)] font-bold leading-none tracking-[-0.06em] tabular-nums text-[#B91C1C]">
@@ -453,13 +453,14 @@ export default function ComparisonResults({
         </p>
 
         <h2 className="mt-3 max-w-3xl text-[clamp(1.9rem,4vw,3.3rem)] font-bold leading-[1.12] tracking-[-0.055em]">
-          Apa yang berubah setelah kebijakan?
+          Bagaimana MAT berubah pada skenario uji?
         </h2>
 
         <p className="mt-4 max-w-3xl text-[13px] leading-7 text-slate-500">
           Perbandingan dua skenario pada horizon 2041, dengan
-          asumsi pertumbuhan yang sama. Visualisasi ini memperlihatkan
-          perubahan permintaan antarzona akibat parameter kebijakan TDM.
+          asumsi pertumbuhan yang sama. Perubahan yang terlihat berasal
+          dari sensitivitas yang diinput langsung; tarif dan peningkatan
+          layanan belum menghasilkan perpindahan moda terhitung.
         </p>
       </div>
 

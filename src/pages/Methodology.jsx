@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import Reveal from "../components/ui/Reveal";
+import { getMatrixDataQualityReport } from "../data/dataValidation";
+import { mat2026 } from "../data/mobility";
 
 // DEWATAMOVE 2041 — RESEARCH METHODOLOGY
 // Light mode | Mathematical notation | Responsive
@@ -161,6 +163,8 @@ const integrity = [
       "Indikator yang belum dapat dihitung secara valid karena keterbatasan data.",
   },
 ];
+
+const matrixQuality = getMatrixDataQualityReport(mat2026);
 
 // MATHEMATICAL EQUATIONS
 // Native MathML — tanpa library tambahan
@@ -323,6 +327,59 @@ function SectionTitle({ eyebrow, title, description }) {
   );
 }
 
+function DataQualityPanel() {
+  return (
+    <section className="border-b border-slate-200 bg-slate-50 px-5 py-16 sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <Reveal>
+          <SectionTitle
+            eyebrow="00 / Data Quality"
+            title="Data Quality & Model Assumptions"
+            description="Ringkasan validasi cepat untuk memastikan MAT, satuan, dan komponen model tetap tertrace dan tidak dipresentasikan sebagai hasil empiris yang belum terverifikasi."
+          />
+        </Reveal>
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Status</div>
+            <div className="mt-3 text-2xl font-black text-[#B91C1C]">{matrixQuality.qualityStatus}</div>
+            <p className="mt-2 text-[12px] leading-6 text-slate-500">MAT dasar 2026 telah diperiksa struktur, satuan, dan total.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Total MAT</div>
+            <div className="mt-3 text-2xl font-black text-slate-900">{new Intl.NumberFormat("id-ID").format(matrixQuality.total)}</div>
+            <p className="mt-2 text-[12px] leading-6 text-slate-500">Dalam satuan smp/jam dan bukan jumlah penumpang.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Intrazonal</div>
+            <div className="mt-3 text-2xl font-black text-slate-900">{new Intl.NumberFormat("id-ID").format(matrixQuality.diagonalTotal)}</div>
+            <p className="mt-2 text-[12px] leading-6 text-slate-500">Perjalanan pada diagonal zona, dipisahkan dari antarzona.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Antarzona</div>
+            <div className="mt-3 text-2xl font-black text-slate-900">{new Intl.NumberFormat("id-ID").format(matrixQuality.offDiagonalTotal)}</div>
+            <p className="mt-2 text-[12px] leading-6 text-slate-500">Total perjalanan antar zona yang bisa dibedakan secara eksplisit.</p>
+          </div>
+        </div>
+
+        {matrixQuality.issues.length > 0 && (
+          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-700">Catatan kualitas</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-[12px] leading-6 text-amber-800">
+              {matrixQuality.issues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // FORMULA SECTION
 
 function MathematicalFoundation() {
@@ -474,6 +531,8 @@ export default function Methodology() {
           </Reveal>
         </div>
       </section>
+
+      <DataQualityPanel />
 
       <section className="px-5 pb-24 pt-8 sm:px-8 sm:pb-32">
         <div className="mx-auto max-w-6xl">

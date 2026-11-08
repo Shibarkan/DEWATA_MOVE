@@ -9,7 +9,8 @@
  *  - Tidak menghitung ridership (orang) dari smp tanpa data okupansi moda.
  *  - Link assignment bersifat all-or-nothing dan hanya untuk cakupan graf OSRM.
  */
-import { mat2026, zoneNames } from "./mobility";
+import { validateMatrixIntegrity } from "./dataValidation.js";
+import { mat2026, zoneNames } from "./mobility.js";
 
 export const ZONE_CENTERS = [
   [-8.6535, 115.2350], [-8.6598, 115.2030], [-8.6250, 115.2100],
@@ -48,12 +49,30 @@ const sumMatrix = (matrix) => matrix.reduce(
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
 export function validateInput(matrix = mat2026) {
-  if (!Array.isArray(matrix) || matrix.length !== 13 ||
-      !matrix.every((r) => Array.isArray(r) && r.length === 13 &&
-        r.every((n) => Number.isFinite(n) && n >= 0))) {
-    throw new Error("MAT harus berupa matriks 13×13 berisi nilai >= 0.");
+  const report = validateMatrixIntegrity(matrix, {
+    year: 2026,
+    period: "peak",
+    unit: "smp/jam",
+    coverage: "Kota Denpasar dan hubungan mobilitas terkait",
+    source: "ITEC-U case study data",
+    datasetType: "MAT",
+    qualityStatus: "Verified",
+  });
+
+  if (!report.valid) {
+    throw new Error(
+      report.issues.length > 0
+        ? report.issues.join(" ")
+        : "MAT harus berupa matriks 13×13 berisi nilai >= 0.",
+    );
   }
-  return true;
+
+  return {
+    valid: true,
+    total: report.total,
+    diagonalTotal: report.diagonalTotal,
+    offDiagonalTotal: report.offDiagonalTotal,
+  };
 }
 
 export function projectMAT2041(annualGrowth = DEFAULT_POLICY.annualGrowth) {

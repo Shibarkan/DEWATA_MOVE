@@ -5,8 +5,9 @@
  * BUKAN hasil kalibrasi terhadap data Denpasar.
  * MAT dalam smp/jam; tidak sama dengan jumlah orang/ridership.
  */
-import { DEFAULT_POLICY, MODEL_ZONES, projectMAT2041 } from "./modelEngine";
-import { matTotal } from "./mobility";
+import { classifyPolicyConstraints } from "./constraintEngine.js";
+import { DEFAULT_POLICY, MODEL_ZONES, projectMAT2041 } from "./modelEngine.js";
+import { matTotal } from "./mobility.js";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, Number(v) || 0));
 const BASE_HEADWAY = 15; // asumsi pembanding, bukan headway TMD terukur
@@ -25,7 +26,7 @@ export const POLICY_REFERENCES = {
   parkingIncrease: {
     preset: "+25% tarif parkir",
     why: "Besaran kebijakan uji, bukan tarif resmi. FHWA menunjukkan bahwa harga parkir dapat memengaruhi pilihan moda, tetapi tidak menetapkan angka 25% untuk Denpasar.",
-    status: "Besaran 25% dan koefisien respons kode adalah asumsi.",
+    status: "Besaran 25% adalah nilai uji, bukan tarif resmi; tidak menghasilkan perubahan MAT pada model aktif.",
     sources: [
       { label: "FHWA — kajian elastisitas parkir", url: "https://ops.fhwa.dot.gov/publications/fhwahop23023/ch2.htm" },
       { label: "UU 22/2009 — manajemen kebutuhan lalu lintas", url: "https://peraturan.bpk.go.id/Details/38654/uu-no-22-tahun-2009" },
@@ -48,17 +49,17 @@ export const POLICY_REFERENCES = {
     ],
   },
   peakShift: {
-    preset: "8% bergeser dari jam puncak",
-    why: "Dipilih sebagai angka uji dalam rentang pembanding 5–10% penurunan arus mobil jam puncak pada pendekat ke pusat kerja dalam evaluasi program jam kerja alternatif. Itu bukan hasil survei Denpasar dan bukan bukti penurunan 8% untuk semua OD.",
-    status: "Asumsi sensitivitas lintas konteks; model saat ini menerapkannya ke semua sel MAT.",
+    preset: "8% pengurangan MAT jam puncak",
+    why: "Angka uji dalam rentang pembanding 5–10% penurunan arus mobil jam puncak pada pendekat pusat kerja dalam evaluasi jam kerja alternatif. Ini bukan hasil survei Denpasar; model mengurangi sel MAT dan tidak memindahkan demand ke periode lain.",
+    status: "Sensitivitas lintas konteks pada semua sel MAT, bukan redistribusi temporal atau prediksi lokal.",
     sources: [
       { label: "TRB/NCHRP Synthesis 73 — alternative work schedules", url: "https://www.trb.org/Publications/Blurbs/161269.aspx" },
     ],
   },
   busPriority: {
     preset: "Aktif",
-    why: "Prioritas bus dapat diteliti melalui prioritas sinyal, pengaturan simpang, dan ruang jalan. Efek tambahan 0,8% pada rumus masih koefisien asumsi.",
-    status: "Intervensi usulan; perlu data tundaan bus, ATCS, dan kondisi simpang.",
+    why: "Prioritas bus dapat diteliti melalui prioritas sinyal, pengaturan simpang, dan ruang jalan. Model aktif belum menghitung dampak numerik intervensi ini.",
+    status: "Intervensi usulan; perlu data tundaan bus, ATCS, kondisi simpang, dan koefisien perilaku.",
     sources: [
       { label: "NACTO — Transit Street Design Guide", url: "https://nacto.org/publication/transit-street-design-guide/" },
     ],
@@ -93,7 +94,7 @@ export const POLICY_SCENARIOS = {
   integrated: { label: "Terintegrasi", ...DEFAULT_POLICY, ...EXTRAS },
   pull: { label: "Pull · TMD + Feeder", ...DEFAULT_POLICY, ...EXTRAS, parkingIncrease: 0, peakShift: 0 },
   push: { label: "Push · Parkir", ...DEFAULT_POLICY, ...EXTRAS, parkingIncrease: 35, targetHeadway: 15, feederAccess: 0, peakShift: 0, busPriority: false },
-  avoid: { label: "Avoid · Jam Puncak", ...DEFAULT_POLICY, ...EXTRAS, parkingIncrease: 0, targetHeadway: 15, feederAccess: 0, peakShift: 12, busPriority: false },
+  avoid: { label: "Avoid · Jam Puncak", ...DEFAULT_POLICY, ...EXTRAS, parkingIncrease: 0, targetHeadway: 15, feederAccess: 0, peakShift: 8, busPriority: false },
 };
 
 export function normalizePolicy(input = {}) {
@@ -124,6 +125,23 @@ export function activePolicies(input) {
   ];
 }
 
+export function auditPolicyConstraints(policy = {}) {
+  return classifyPolicyConstraints({
+    constraints: ["time", "cost", "spatial"],
+    requiredInputs: [
+      "parkingDuration",
+      "vehicleType",
+      "parkingZone",
+      "parkingTariff",
+    ],
+    inputData: policy.inputData || policy,
+    modelStatus: policy.modelStatus || "assumption-dependent",
+    reason: policy.reason,
+  });
+}
+
+export const policyConstraintAudit = auditPolicyConstraints();
+
 // Jarak garis lurus antarpusat zona (km), bukan jarak jaringan jalan.
 function distanceKm(i, j) {
   const a = MODEL_ZONES[i], b = MODEL_ZONES[j];
@@ -138,11 +156,9 @@ function distanceKm(i, j) {
 /** Mengurangi volume secara berurutan, bukan menjumlah persentase mentah. */
 export function evaluateODResponse(value, i, j, input) {
   const p = normalizePolicy(input);
-  const destinationWeight = HUBS.has(j) ? 1 : 0.45;
-  const transitWeight = ORIGINS.has(i) && HUBS.has(j) ? 1 : 0.55;
-  // Koefisien baseline dipertahankan agar hasil default tetap sama.
-  const parkingRate = clamp(p.parkingIncrease * 0.0005 * destinationWeight, 0, 0.08);
-  const transitRate = clamp((Math.max(0, BASE_HEADWAY - p.targetHeadway) * 0.0035 + p.feederAccess * 0.00065 + (p.busPriority ? 0.008 : 0)) * transitWeight, 0, 0.14);
+  // Tarif dan perubahan layanan tidak mengubah MAT tanpa model perilaku terkalibrasi.
+  const parkingRate = 0;
+  const transitRate = 0;
   const peakRate = p.peakShift / 100;
   // Parameter baru adalah proksi eksperimen, tidak mewakili persentase orang.
   const wfhRate = p.wfhReduction / 100;
@@ -184,7 +200,7 @@ export function createPolicyModel(input = DEFAULT_POLICY) {
     base2026: matTotal, beforeTotal, afterTotal,
     reduction: beforeTotal ? (beforeTotal - afterTotal) / beforeTotal : 0,
     effects, pairs,
-    method: "Proyeksi MAT 2041 dan respons TDM berurutan dengan koefisien asumsi",
-    caveat: "Model belum terkalibrasi. Angka skenario bukan dampak empiris di Denpasar. MAT smp/jam bukan jumlah orang. Mode WFH/park-and-ride/sepeda merupakan proksi kendaraan, tanpa pilihan moda terkalibrasi.",
+    method: "Proyeksi MAT 2041 dan sensitivitas perubahan jam puncak/perjalanan yang diinput langsung",
+    caveat: "Perubahan tarif parkir, headway, feeder, dan prioritas bus belum mengubah MAT karena belum ada model pilihan moda terkalibrasi. Persentase jam puncak/WFH/park-and-ride/sepeda adalah sensitivitas eksplisit, bukan prediksi respons. MAT smp/jam bukan jumlah orang.",
   };
 }

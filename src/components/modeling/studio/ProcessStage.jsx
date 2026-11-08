@@ -24,6 +24,15 @@ export default function ProcessStage({
                       skenario ditekan.
                     </p>
 
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[11px] leading-5 text-amber-900">
+                      Tarif parkir, headway, akses feeder, dan prioritas bus
+                      belum mengubah MAT karena model pilihan moda dan
+                      koefisien lokal belum tersedia. Persentase pengurangan
+                      MAT puncak adalah sensitivitas langsung, tidak
+                      didistribusikan ke periode nonpuncak dan bukan
+                      perpindahan moda terhitung.
+                    </p>
+
                     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[11px] leading-5 text-slate-600">
                       <p className="font-bold text-slate-800">Referensi dan alasan pemilihan nilai</p>
                       <p className="mt-1">
@@ -50,7 +59,7 @@ export default function ProcessStage({
                         </a>
                       </div>
                       <p className="mt-2 text-[10px] text-slate-500">
-                        PKJI digunakan untuk kapasitas dan derajat kejenuhan; PKJI tidak menetapkan nilai 8%, 25%, atau indeks feeder 30%.
+                        PKJI adalah rujukan untuk analisis kapasitas/derajat kejenuhan mendatang; AON saat ini belum menghitungnya. PKJI tidak menetapkan nilai 8%, 25%, atau indeks feeder 30%.
                       </p>
                     </div>
 
@@ -148,7 +157,7 @@ export default function ProcessStage({
                       />
 
                       <Slider
-                        label="Pergeseran jam puncak"
+                        label="Pengurangan MAT jam puncak"
                         policyKey="peakShift"
                         min={0}
                         max={30}
@@ -179,16 +188,19 @@ export default function ProcessStage({
                       <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
                         <p>
                           <strong className="text-slate-800">Mengapa prioritas bus aktif? </strong>
-                          {POLICY_REFERENCES.busPriority.reason}
+                          {POLICY_REFERENCES.busPriority.why}
                         </p>
-                        <a
-                          href={POLICY_REFERENCES.busPriority.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-block font-semibold text-[#B91C1C] underline underline-offset-2"
-                        >
-                          Lihat sumber: NACTO — prioritas bus ↗
-                        </a>
+                        {POLICY_REFERENCES.busPriority.sources.map((source) => (
+                          <a
+                            key={source.url}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 mr-3 inline-block font-semibold text-[#B91C1C] underline underline-offset-2"
+                          >
+                            Lihat sumber: {source.label} ↗
+                          </a>
+                        ))}
                         <p className="mt-1 text-[10px] text-slate-500">
                           {POLICY_REFERENCES.busPriority.status}
                         </p>

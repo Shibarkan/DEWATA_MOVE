@@ -20,9 +20,12 @@ export default function MethodLimits({ details, setDetails, assignment }) {
                     <p>
                       MAT 2026 diproyeksikan sampai 2041
                       memakai pertumbuhan majemuk.
-                      Kebijakan TDM memengaruhi permintaan
-                      menurut koefisien sensitivitas
-                      asumsi, bukan hasil kalibrasi survei.
+                      Tarif parkir, headway, feeder dan
+                      prioritas bus belum mengubah MAT.
+                      Pengurangan MAT jam puncak dan
+                      WFH/park-and-ride/sepeda adalah
+                      sensitivitas eksplisit, bukan respons
+                      perilaku hasil kalibrasi survei.
                     </p>
 
                     <p>

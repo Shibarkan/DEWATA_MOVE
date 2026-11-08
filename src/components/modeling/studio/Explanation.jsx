@@ -32,11 +32,11 @@ export default function Explanation({ stage }) {
     before:
       "Data asal–tujuan diproyeksikan dan dibebankan pada koridor yang tersambung di jaringan sampel.",
     process:
-      "Slider kebijakan mengubah permintaan pada pratinjau secara langsung. Tekan Terapkan untuk menyimpan hasil After.",
+      "Tarif dan layanan dicatat sebagai atribut skenario; hanya sensitivitas yang diinput langsung mengubah matriks. Tekan Terapkan untuk menyimpan hasil After.",
     after:
-      "Model menghitung ulang permintaan, lalu peta menggambarkan perubahan tekanan arus dan gerak kendaraan.",
+      "Model menerapkan sensitivitas eksplisit; peta menggambarkan tekanan arus relatif pada jaringan sampel.",
     comparison:
-      "Ringkasan Before–After dan heatmap OD menyajikan dampak kebijakan dalam angka yang mudah dibandingkan.",
+      "Ringkasan Before–After dan heatmap OD menyajikan hasil skenario sensitivitas, bukan dampak kebijakan terkalibrasi.",
   };
 
   return (

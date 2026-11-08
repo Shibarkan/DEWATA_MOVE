@@ -853,7 +853,7 @@ export default function ModelMap({
             ["#0F766E", "Rendah"],
             ["#D3AD4C", "Sedang"],
             ["#E58C32", "Tinggi"],
-            ["#B91C1C", "Sangat padat"],
+            ["#B91C1C", "Sangat tinggi"],
           ].map(([color, label]) => (
             <span key={label} className="flex items-center gap-1.5">
               <span
