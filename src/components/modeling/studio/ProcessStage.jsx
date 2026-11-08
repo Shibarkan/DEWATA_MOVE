@@ -1,6 +1,6 @@
 import { POLICY_SCENARIOS, POLICY_REFERENCES, normalizePolicy } from "../../../data/policyEngine";
 import { Slider, SectionHeading } from "./Controls";
-import MapPair from "./MapPair";
+import MapPair from "./Mappair";
 
 export default function ProcessStage({
   draft, setDraft, updateDraft, apply, runPhase,
